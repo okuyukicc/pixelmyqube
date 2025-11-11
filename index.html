@@ -28,7 +28,8 @@
                             <div class="color-swatch" data-color="#38A169" style="background-color: #38A169" title="Green"></div>
                             <div class="color-swatch" data-color="#3182CE" style="background-color: #3182CE" title="Blue"></div>
                             <div class="color-swatch" data-color="#D69E2E" style="background-color: #D69E2E" title="Yellow"></div>
-                            <div class="color-swatch" data-color="#2D3748" style="background-color: #2D3748" title="Black"></div>
+                            <!-- Color changed from Black (#2D3748) to White (#ffffff) -->
+                            <div class="color-swatch" data-color="#ffffff" style="background-color: #ffffff" title="White"></div>
                             
                             <input type="color" id="color-picker" class="w-10 h-10 p-0 border-none cursor-pointer rounded-full" value="#FF0000">
                         </div>
@@ -360,10 +361,10 @@
 
 
             const resourcesXML = `
-<resources>
-    ${baseMaterialsXML}
+            ${baseMaterialsXML}
     
-    <object id="2" type="model" pid="1">
+    <!-- Removed pid="1" from the object definition -->
+    <object id="2" type="model">
         <mesh>
             ${verticesXML}
             ${trianglesXML}
@@ -383,8 +384,8 @@
                     
                     const colorIndex = uniqueColors.indexOf(color);
                     
-                    // The crucial change: pindex="${colorIndex}" is now correctly added
-                    buildItemsXML += `\n    <item objectid="2" pindex="${colorIndex}" transform="${transform}" />`;
+                    // The crucial change: added pid="1" to each <item>
+                    buildItemsXML += `\n    <item objectid="2" pid="1" pindex="${colorIndex}" transform="${transform}" />`;
                 }
             });
             
