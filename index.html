@@ -364,10 +364,11 @@
             trianglesXML += `\n    </triangles>`;
 
             // 2. Define ONE object (ID=2) that contains the mesh.
-            // CRITICAL: It MUST reference the material group (pid="1") here.
-            // This is what slicers need to see to know the object *can* be colored.
+            // CRITICAL: We REMOVE pid="1" from here. The object is JUST geometry.
+            // The <item> will define the color. This fixes slicers that
+            // ignore the <item> color if the <object> has a pid.
             resourcesXML += `
-    <object id="2" type="model" pid="1">
+    <object id="2" type="model">
         <mesh>
             ${verticesXML}
             ${trianglesXML}
