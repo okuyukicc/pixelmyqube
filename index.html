@@ -346,7 +346,13 @@
             });
             baseMaterialsXML += `\n</basematerials>`;
 
-            // --- Geometry from the parsed .OBJ model ---
+            // --- NEW: Re-architected 3MF Generation ---
+
+            let resourcesXML = `\n    ${baseMaterialsXML}`;
+
+            // 1. Define the base mesh (geometry from pixel.obj)
+            const baseMeshId = 100; // ID for the raw geometry
+            
             let verticesXML = `<vertices>`;
             customGeometry.vertices.forEach(v => {
                 verticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
@@ -359,19 +365,37 @@
             });
             trianglesXML += `\n    </triangles>`;
 
-
-            const resourcesXML = `
-            ${baseMaterialsXML}
-    
-    <!-- Removed pid="1" from the object definition -->
-    <object id="2" type="model">
+            // Add the base mesh to resources
+            resourcesXML += `
+    <object id="${baseMeshId}" type="model">
         <mesh>
             ${verticesXML}
             ${trianglesXML}
         </mesh>
-    </object>
-</resources>`;
+    </object>`;
+
+            // 2. Define a "Colored Object" for each unique color used
+            // This map will store which Object ID corresponds to which color
+            const colorToObjectMap = {}; 
             
+            uniqueColors.forEach((color, index) => {
+                const coloredObjectId = baseMeshId + 1 + index; // e.g., 101, 102, ...
+                colorToObjectMap[color] = coloredObjectId; // Map "#E53E3E" -> 101
+
+                // This object is a "component" that *references* the base mesh
+                // and *assigns* a color to it (pid="1" pindex="index")
+                resourcesXML += `
+    <object id="${coloredObjectId}" type="model" pid="1" pindex="${index}">
+        <components>
+            <component objectid="${baseMeshId}" />
+        </components>
+    </object>`;
+            });
+
+            // Wrap everything in the <resources> tag
+            const finalResourcesXML = `<resources>${resourcesXML}\n</resources>`;
+            
+            // 3. Build the scene using the new "Colored Objects"
             let buildItemsXML = "";
             const objectCenterOffset = OBJECT_DIM_MM / 2; // Assume the model is centered at 0,0
 
@@ -382,10 +406,11 @@
                     
                     const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
                     
-                    const colorIndex = uniqueColors.indexOf(color);
+                    // Find the correct, pre-colored Object ID to place
+                    const objectIdToPlace = colorToObjectMap[color];
                     
-                    // The crucial change: added pid="1" to each <item>
-                    buildItemsXML += `\n    <item objectid="2" pid="1" pindex="${colorIndex}" transform="${transform}" />`;
+                    // Place an item referencing the colored object
+                    buildItemsXML += `\n    <item objectid="${objectIdToPlace}" transform="${transform}" />`;
                 }
             });
             
@@ -393,7 +418,7 @@
 
             const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel">
-    ${resourcesXML}
+    ${finalResourcesXML}
     ${buildXML}
 </model>`;
 
