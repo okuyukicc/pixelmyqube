@@ -3,39 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 1. Title updated --><title>pixelmyqube</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<!-- El bloque <style> se ha movido a assets/style.css --><link rel="stylesheet" href="assets/style.css">
+    <title>pixelmyqube</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Load external stylesheet -->
+    <link rel="stylesheet" href="assets/style.css">
 </head>
-<!-- Fondo del body cambiado a negro --><body class="bg-black font-sans flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-black font-sans flex flex-col items-center justify-center min-h-screen p-4">
 
-<div class="bg-white shadow-xl rounded-lg p-6 w-full max-w-4xl">
-    
-    <!-- 4. Text translated to English --><!-- H1 cambiado --><h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PixelmyQube</h1>
-    
-    <div class="flex flex-col lg:flex-row gap-6">
+    <div class="bg-white shadow-xl rounded-lg p-6 w-full max-w-4xl">
+        
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PixelmyQube</h1>
+        
+        <div class="flex flex-col lg:flex-row gap-6">
 
-        <div class="flex-shrink-0 lg:w-1/3">
+            <!-- Left Panel: Controls & Stats -->
+            <div class="flex-shrink-0 lg:w-1/3">
                 <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
                     <h2 class="text-xl font-semibold mb-4 text-gray-700">Controls</h2>
 
-                    <!-- Color Palette --><div class="mb-4">
+                    <!-- Color Palette -->
+                    <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-600 mb-2">Color</label>
                         <div id="color-palette" class="flex flex-wrap gap-3 items-center">
+                            <!-- Eraser -->
                             <div class="color-swatch active" data-color="null" style="background-color: #f0f0f0; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 class=%22feather feather-delete%22><path d=%22M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z%22></path><line x1=%2218%22 y1=%229%22 x2=%2212%22 y2=%2215%22></line><line x1=%2212%22 y1=%229%22 x2=%2218%22 y2=%2215%22></line></svg>'); background-size: 60%; background-position: center; background-repeat: no-repeat;" title="Eraser"></div>
+                            <!-- Colors -->
                             <div class="color-swatch" data-color="#E53E3E" style="background-color: #E53E3E" title="Red"></div>
                             <div class="color-swatch" data-color="#38A169" style="background-color: #38A169" title="Green"></div>
                             <div class="color-swatch" data-color="#3182CE" style="background-color: #3182CE" title="Blue"></div>
                             <div class="color-swatch" data-color="#D69E2E" style="background-color: #D69E2E" title="Yellow"></div>
-                            <!-- Color changed from Black (#2D3748) to White (#ffffff) -->
-                            <div class="color-swatch" data-color="#ffffff" style="background-color: #ffffff" title="White"></div>
+                            <!-- Swapped Black for White -->
+                            <div class="color-swatch" data-color="#ffffff" style="background-color: #ffffff; border: 1px solid #ddd;" title="White"></div>
                             
                             <input type="color" id="color-picker" class="w-10 h-10 p-0 border-none cursor-pointer rounded-full" value="#FF0000">
                         </div>
                     </div>
 
-                    <!-- Actions --><div class="flex flex-col gap-3 mt-6">
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col gap-3 mt-6">
                         <button id="clear-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                             Clear Grid
                         </button>
@@ -44,11 +51,13 @@
                         </button>
                     </div>
 
-                    <!-- Statistics --><div id="stats-container" class="mt-6">
+                    <!-- Statistics -->
+                    <div id="stats-container" class="mt-6">
                         <h3 class="text-lg font-semibold text-gray-700">Statistics</h3>
                         <div class="bg-white p-3 rounded mt-2">
                             <p id="pixel-count-total" class="text-sm text-gray-600">Total: 0 pixels</p>
                             <div id="pixel-count-colors" class="mt-2 text-sm">
+                                <!-- Stats generated by JS -->
                             </div>
                         </div>
                     </div>
@@ -56,16 +65,18 @@
                 </div>
             </div>
 
+            <!-- Right Panel: Grid -->
             <div class="flex-grow flex items-center justify-center">
                 <div id="grid-container" class="shadow-lg">
+                    <!-- Grid generated by JS -->
                 </div>
             </div>
 
-        </div> 
+        </div> <!-- end flex-col/row -->
+    </div> <!-- end main white panel -->
 
-    </div> 
-
-    <!-- 3. Footer Added --><footer class="text-center text-gray-600 text-sm mt-8 pb-4">
+    <!-- Footer -->
+    <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
         by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest.
     </footer>
 
@@ -82,6 +93,7 @@
         // We assume the OBJ is normalized from -1 to 1 (approx)
         // (20mm width / 2 units) = 10
         // (9.40mm height / ~0.94 units) = 10
+        // Adjust these if your model isn't centered or has different proportions
         const OBJ_SCALE_X = 10.0;
         const OBJ_SCALE_Y = 10.0;
         const OBJ_SCALE_Z = 10.0; 
@@ -95,9 +107,10 @@
         const statsTotalEl = document.getElementById('pixel-count-total');
         const statsColorsEl = document.getElementById('pixel-count-colors');
         
-        let selectedColor = "null"; 
+        let selectedColor = "null"; // "null" is the eraser
         let isMouseDown = false; 
 
+        // 1D array to store the color of each grid cell
         let gridData = new Array(GRID_SIZE * GRID_SIZE).fill(null);
         
         // Geometry of the loaded model
@@ -107,7 +120,7 @@
          * Creates the pixel grid in the DOM
          */
         function createGrid() {
-            gridContainer.innerHTML = ''; 
+            gridContainer.innerHTML = ''; // Clear existing grid
             for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
                 const pixel = document.createElement('div');
                 pixel.classList.add('grid-pixel');
@@ -133,6 +146,7 @@
             }
         }
         
+        // Stop painting if mouse leaves grid or is released anywhere
         window.addEventListener('mouseup', () => {
             isMouseDown = false;
         });
@@ -149,9 +163,12 @@
         function paintPixel(pixelInnerElement, index) {
             const newColor = selectedColor === "null" ? null : selectedColor;
             
+            // Only update if the color is different
             if (gridData[index] !== newColor) {
                 gridData[index] = newColor;
                 pixelInnerElement.style.backgroundColor = newColor || 'transparent';
+                
+                // Add/remove 'painted' class to show/hide the black dot
                 if (newColor === null) {
                     pixelInnerElement.classList.remove('painted');
                 } else {
@@ -188,7 +205,7 @@
                 colorCounts[color] = (colorCounts[color] || 0) + 1;
             });
             
-            statsColorsEl.innerHTML = ''; 
+            statsColorsEl.innerHTML = ''; // Clear previous stats
             const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
             
             if (sortedColors.length === 0) {
@@ -212,22 +229,32 @@
 
         // --- 3. COLOR PALETTE LOGIC ---
 
+        /**
+         * Sets the new active color
+         * @param {string | null} newColor - The hex code or "null" for eraser
+         * @param {HTMLElement | null} activeSwatch - The DOM element of the swatch clicked
+         */
         function selectColor(newColor, activeSwatch) {
             selectedColor = newColor;
             
+            // Remove 'active' class from all swatches
             colorPalette.querySelectorAll('.color-swatch').forEach(swatch => {
                 swatch.classList.remove('active');
             });
             
+            // Add 'active' class to the clicked swatch
             if (activeSwatch) {
                 activeSwatch.classList.add('active');
             }
             
+            // Update the color picker if a color (not eraser) was selected
             if (newColor !== 'null' && !activeSwatch) {
+                // This means the color picker itself was used
                 colorPicker.value = newColor;
             }
         }
 
+        // Event listener for the palette
         colorPalette.addEventListener('click', (e) => {
             const swatch = e.target.closest('.color-swatch');
             if (swatch) {
@@ -236,6 +263,7 @@
             }
         });
 
+        // Event listener for the custom color picker
         colorPicker.addEventListener('input', (e) => {
             selectColor(e.target.value, null);
         });
@@ -293,11 +321,10 @@
          */
         async function loadCustomModel() {
             try {
-                // 5. OBJ path updated
-                // IMPORTANT: The file must be at 'assets/pixel.obj'
                 const objPath = 'assets/pixel.obj';
-                const currentScriptUrl = new URL(import.meta.url);
-                const absoluteObjUrl = new URL(objPath, currentScriptUrl).href;
+                // Build an absolute URL relative to the script's location
+                // This is more robust than just 'assets/pixel.obj'
+                const absoluteObjUrl = new URL(objPath, window.location.href).href;
 
                 const response = await fetch(absoluteObjUrl);
                 if (!response.ok) {
@@ -312,7 +339,12 @@
 
             } catch (error) {
                 console.error(error);
-                alert(`Fatal Error: Could not load the 3D model. ${error.message}\n\nTo test locally, you need to run a local web server (e.g., 'python -m http.server' in the project folder).`);
+                // Provide a clearer error message for the common 'file://' issue
+                if (window.location.protocol === 'file:') {
+                    alert(`Fatal Error: Could not load the 3D model.\n\nThis page is running from a local 'file://' address. Due to browser security, it cannot load the 'pixel.obj' file.\n\nTo fix this, please run it from a local web server (e.g., 'python -m http.server') or view it on GitHub Pages.`);
+                } else {
+                    alert(`Fatal Error: Could not load the 3D model. ${error.message}`);
+                }
                 downloadBtn.textContent = 'Error loading model';
             }
         }
@@ -320,6 +352,9 @@
 
         // --- 5. .3MF GENERATION LOGIC ---
 
+        /**
+         * Generates and triggers the download of the .3MF file
+         */
         async function generateAndDownload3MF() {
             
             // Check if the model is loaded
@@ -331,26 +366,29 @@
             console.log("Generating .3MF file with custom model...");
             const zip = new JSZip();
 
+            // --- .rels file (standard) ---
             const relsXML = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
     <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />
 </Relationships>`;
             zip.folder("_rels").file(".rels", relsXML);
 
+            // --- 3dmodel.model file (the main content) ---
+            
+            // 1. Define Materials
             const uniqueColors = [...new Set(gridData.filter(c => c !== null))];
             
             let baseMaterialsXML = `<basematerials id="1">`; 
             uniqueColors.forEach((color, index) => {
-                const sRGBColor = color.substring(1); 
+                const sRGBColor = color.substring(1); // Remove '#'
                 baseMaterialsXML += `\n    <base name="Color ${index}" displaycolor="#${sRGBColor}" />`;
             });
             baseMaterialsXML += `\n</basematerials>`;
 
-            // --- NEW: Re-architected 3MF Generation (Single Mesh, Robust Item-level Color) ---
-
+            
+            // 2. Define ONE base object (the mesh)
             let resourcesXML = `\n    ${baseMaterialsXML}`;
 
-            // 1. Get the geometry strings ONCE
             let verticesXML = `<vertices>`;
             customGeometry.vertices.forEach(v => {
                 verticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
@@ -363,10 +401,9 @@
             });
             trianglesXML += `\n    </triangles>`;
 
-            // 2. Define ONE object (ID=2) that contains the mesh.
-            // CRITICAL: We REMOVE pid="1" from here. The object is JUST geometry.
-            // The <item> will define the color. This fixes slicers that
-            // ignore the <item> color if the <object> has a pid.
+            // ** THE FIX IS HERE **
+            // The <object> (ID=2) is JUST geometry. It has NO 'pid' (property ID).
+            // This forces the slicer to look at the <item> for color info.
             resourcesXML += `
     <object id="2" type="model">
         <mesh>
@@ -375,33 +412,33 @@
         </mesh>
     </object>`;
 
-            // Wrap everything in the <resources> tag
             const finalResourcesXML = `<resources>${resourcesXML}\n</resources>`;
             
-            // 3. Build the scene. Each <item> specifies its own color index (pindex)
+            // 3. Build the scene with colored items
             let buildItemsXML = "";
             const objectCenterOffset = OBJECT_DIM_MM / 2; // Assume the model is centered at 0,0
 
             gridData.forEach((color, index) => {
                 if (color !== null) {
+                    // Calculate 3D position
                     const x = (index % GRID_SIZE) * TOTAL_CELL_DIM_MM + objectCenterOffset;
+                    // Invert Y-axis for 3D build (grid 0,0 is top-left, 3D 0,0 is bottom-left)
                     const y = (GRID_SIZE - 1 - Math.floor(index / GRID_SIZE)) * TOTAL_CELL_DIM_MM + objectCenterOffset; 
-                
-                const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
-                
-                // Find the color index
-                const colorIndex = uniqueColors.indexOf(color);
-                
-                // This is the most robust way that slicers understand:
-                // objectid="2" -> Use the single mesh
-                // pid="1" -> Use the main material group
-                // pindex="${colorIndex}" -> Use *this specific color* from the group
-                buildItemsXML += `\n    <item objectid="2" pid="1" pindex="${colorIndex}" transform="${transform}" />`;
-            }
-        });
-        
-        const buildXML = `<build>${buildItemsXML}\n</build>`;
+                    
+                    const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
+                    
+                    // Find the color index from our unique list
+                    const colorIndex = uniqueColors.indexOf(color);
+                    
+                    // The <item> tag now defines the color property (pid="1")
+                    // and the specific color index (pindex="...")
+                    buildItemsXML += `\n    <item objectid="2" pid="1" pindex="${colorIndex}" transform="${transform}" />`;
+                }
+            });
+            
+            const buildXML = `<build>${buildItemsXML}\n</build>`;
 
+            // 4. Assemble the final XML
             const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel">
     ${finalResourcesXML}
@@ -410,6 +447,7 @@
 
             zip.folder("3D").file("3dmodel.model", modelXML);
 
+            // 5. Trigger Download
             try {
                 const blob = await zip.generateAsync({ type: "blob" });
                 
@@ -438,7 +476,7 @@
         updateStats();
         selectColor('null', document.querySelector('.color-swatch[data-color="null"]'));
         
-        // Start loading the .OBJ model
+        // Start loading the .OBJ model as soon as the page runs
         loadCustomModel();
 
     </script>
