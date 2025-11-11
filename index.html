@@ -346,7 +346,7 @@
             });
             baseMaterialsXML += `\n</basematerials>`;
 
-            // --- NEW: Re-architected 3MF Generation (Mesh Duplication) ---
+            // --- NEW: Re-architected 3MF Generation (Single Mesh, Robust Item-level Color) ---
 
             let resourcesXML = `\n    ${baseMaterialsXML}`;
 
@@ -363,29 +363,21 @@
             });
             trianglesXML += `\n    </triangles>`;
 
-            // 2. Define a FULL, NEW object for each unique color
-            // This map will store which Object ID corresponds to which color
-            const colorToObjectMap = {}; 
-            
-            uniqueColors.forEach((color, index) => {
-                const coloredObjectId = 100 + 1 + index; // e.g., 101, 102, ...
-                colorToObjectMap[color] = coloredObjectId; // Map "#E53E3E" -> 101
-
-                // This object contains the FULL mesh data, repeated for each color.
-                // It is assigned its color via pid="1" and pindex="index".
-                resourcesXML += `
-    <object id="${coloredObjectId}" type="model" pid="1" pindex="${index}">
+            // 2. Define ONE object (ID=2) that contains the mesh.
+            // CRITICAL: It MUST reference the material group (pid="1") here.
+            // This is what slicers need to see to know the object *can* be colored.
+            resourcesXML += `
+    <object id="2" type="model" pid="1">
         <mesh>
             ${verticesXML}
             ${trianglesXML}
         </mesh>
     </object>`;
-            });
 
             // Wrap everything in the <resources> tag
             const finalResourcesXML = `<resources>${resourcesXML}\n</resources>`;
             
-            // 3. Build the scene using the new "Colored Objects"
+            // 3. Build the scene. Each <item> specifies its own color index (pindex)
             let buildItemsXML = "";
             const objectCenterOffset = OBJECT_DIM_MM / 2; // Assume the model is centered at 0,0
 
@@ -393,18 +385,21 @@
                 if (color !== null) {
                     const x = (index % GRID_SIZE) * TOTAL_CELL_DIM_MM + objectCenterOffset;
                     const y = (GRID_SIZE - 1 - Math.floor(index / GRID_SIZE)) * TOTAL_CELL_DIM_MM + objectCenterOffset; 
-                    
-                    const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
-                    
-                    // Find the correct, pre-colored Object ID to place
-                    const objectIdToPlace = colorToObjectMap[color];
-                    
-                    // Place an item referencing the colored object
-                    buildItemsXML += `\n    <item objectid="${objectIdToPlace}" transform="${transform}" />`;
-                }
-            });
-            
-            const buildXML = `<build>${buildItemsXML}\n</build>`;
+                
+                const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
+                
+                // Find the color index
+                const colorIndex = uniqueColors.indexOf(color);
+                
+                // This is the most robust way that slicers understand:
+                // objectid="2" -> Use the single mesh
+                // pid="1" -> Use the main material group
+                // pindex="${colorIndex}" -> Use *this specific color* from the group
+                buildItemsXML += `\n    <item objectid="2" pid="1" pindex="${colorIndex}" transform="${transform}" />`;
+            }
+        });
+        
+        const buildXML = `<build>${buildItemsXML}\n</build>`;
 
             const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel">
