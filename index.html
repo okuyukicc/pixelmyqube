@@ -3,21 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 1. Title updated -->
-    <title>pixelmyqube</title>
+    <!-- 1. Title updated --><title>pixelmyqube</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<!-- El bloque <style> se ha movido a assets/style.css -->
-<link rel="stylesheet" href="assets/style.css">
+<!-- El bloque <style> se ha movido a assets/style.css --><link rel="stylesheet" href="assets/style.css">
 </head>
-<!-- Fondo del body cambiado a negro -->
-<body class="bg-black font-sans flex flex-col items-center justify-center min-h-screen p-4">
+<!-- Fondo del body cambiado a negro --><body class="bg-black font-sans flex flex-col items-center justify-center min-h-screen p-4">
 
 <div class="bg-white shadow-xl rounded-lg p-6 w-full max-w-4xl">
     
-    <!-- 4. Text translated to English -->
-    <!-- H1 cambiado -->
-    <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PixelmyQube</h1>
+    <!-- 4. Text translated to English --><!-- H1 cambiado --><h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PixelmyQube</h1>
     
     <div class="flex flex-col lg:flex-row gap-6">
 
@@ -69,8 +64,7 @@
 
     </div> 
 
-    <!-- 3. Footer Added -->
-    <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
+    <!-- 3. Footer Added --><footer class="text-center text-gray-600 text-sm mt-8 pb-4">
         by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest.
     </footer>
 
@@ -300,9 +294,13 @@
             try {
                 // 5. OBJ path updated
                 // IMPORTANT: The file must be at 'assets/pixel.obj'
-                const response = await fetch('assets/pixel.obj');
+                const objPath = 'assets/pixel.obj';
+                const currentScriptUrl = new URL(import.meta.url);
+                const absoluteObjUrl = new URL(objPath, currentScriptUrl).href;
+
+                const response = await fetch(absoluteObjUrl);
                 if (!response.ok) {
-                    throw new Error(`Error loading 'assets/pixel.obj': ${response.statusText}`);
+                    throw new Error(`Error loading '${objPath}': ${response.statusText}. Please ensure 'assets/pixel.obj' exists and is accessible.`);
                 }
                 const objText = await response.text();
                 customGeometry = parseOBJ(objText);
@@ -313,7 +311,7 @@
 
             } catch (error) {
                 console.error(error);
-                alert("Fatal Error: Could not load 'assets/pixel.obj'.\n\nMake sure the file exists in the 'assets' folder and is named 'pixel.obj'.");
+                alert(`Fatal Error: Could not load the 3D model. ${error.message}\n\nTo test locally, you need to run a local web server (e.g., 'python -m http.server' in the project folder).`);
                 downloadBtn.textContent = 'Error loading model';
             }
         }
@@ -385,6 +383,7 @@
                     
                     const colorIndex = uniqueColors.indexOf(color);
                     
+                    // The crucial change: pindex="${colorIndex}" is now correctly added
                     buildItemsXML += `\n    <item objectid="2" pindex="${colorIndex}" transform="${transform}" />`;
                 }
             });
