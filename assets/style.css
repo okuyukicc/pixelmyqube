@@ -1,0 +1,77 @@
+/* General Styles */
+body {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/* Grid Container */
+#grid-container {
+    display: grid;
+    grid-template-columns: repeat(17, 1fr);
+    grid-template-rows: repeat(17, 1fr);
+    border: 2px solid #333;
+    width: 400px; /* Total visible grid size */
+    height: 400px;
+    cursor: crosshair;
+    background-image: url('q540.jpg'); 
+    background-size: cover; 
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative; 
+    overflow: hidden;
+    padding: 64px;
+    box-sizing: border-box; /* To ensure padding is included in the 400px */
+}
+
+/* Each "pixel" in the grid */
+.grid-pixel {
+    width: 100%;
+    height: 100%;
+    display: flex; 
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box; 
+}
+
+.pixel-inner {
+    width: 85%; /* Adjust the size of the disc inside its cell */
+    height: 85%;
+    border-radius: 50%; /* This makes the disc */
+    background-color: transparent;
+    position: relative;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1) inset; /* Soft border */
+    transition: background-color 0.1s ease;
+}
+
+.pixel-inner.painted::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); 
+    width: 40%; /* Size of the black dot (40% of the disc) */
+    height: 40%;
+    background-color: #000;
+    border-radius: 50%;
+    box-shadow: 0 0 2px rgba(255,255,255,0.2) inset; 
+}
+
+/* Colors and active swatch in the palette */
+.color-swatch {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #ccc;
+    transition: transform 0.1s ease;
+}
+.color-swatch.active {
+    border-color: #007bff;
+    transform: scale(1.15);
+    box-shadow: 0 0 10px rgba(0,123,255,0.5);
+}
+
+/* Style for the download button while loading */
+#download-btn:disabled {
+    background-color: #90bdf9;
+    cursor: not-allowed;
+}
