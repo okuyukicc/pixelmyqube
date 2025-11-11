@@ -346,13 +346,11 @@
             });
             baseMaterialsXML += `\n</basematerials>`;
 
-            // --- NEW: Re-architected 3MF Generation ---
+            // --- NEW: Re-architected 3MF Generation (Mesh Duplication) ---
 
             let resourcesXML = `\n    ${baseMaterialsXML}`;
 
-            // 1. Define the base mesh (geometry from pixel.obj)
-            const baseMeshId = 100; // ID for the raw geometry
-            
+            // 1. Get the geometry strings ONCE
             let verticesXML = `<vertices>`;
             customGeometry.vertices.forEach(v => {
                 verticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
@@ -365,30 +363,22 @@
             });
             trianglesXML += `\n    </triangles>`;
 
-            // Add the base mesh to resources
-            resourcesXML += `
-    <object id="${baseMeshId}" type="model">
-        <mesh>
-            ${verticesXML}
-            ${trianglesXML}
-        </mesh>
-    </object>`;
-
-            // 2. Define a "Colored Object" for each unique color used
+            // 2. Define a FULL, NEW object for each unique color
             // This map will store which Object ID corresponds to which color
             const colorToObjectMap = {}; 
             
             uniqueColors.forEach((color, index) => {
-                const coloredObjectId = baseMeshId + 1 + index; // e.g., 101, 102, ...
+                const coloredObjectId = 100 + 1 + index; // e.g., 101, 102, ...
                 colorToObjectMap[color] = coloredObjectId; // Map "#E53E3E" -> 101
 
-                // This object is a "component" that *references* the base mesh
-                // and *assigns* a color to it (pid="1" pindex="index")
+                // This object contains the FULL mesh data, repeated for each color.
+                // It is assigned its color via pid="1" and pindex="index".
                 resourcesXML += `
     <object id="${coloredObjectId}" type="model" pid="1" pindex="${index}">
-        <components>
-            <component objectid="${baseMeshId}" />
-        </components>
+        <mesh>
+            ${verticesXML}
+            ${trianglesXML}
+        </mesh>
     </object>`;
             });
 
