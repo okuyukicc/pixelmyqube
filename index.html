@@ -85,7 +85,7 @@
 
     <!-- Footer -->
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.3</span>
+        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.4</span>
     </footer>
 
     <!-- 
@@ -333,7 +333,7 @@
         }
 
 
-        // --- 5. .3MF GENERATION LOGIC (v1.3 - Using THREE.3MFExporter) ---
+        // --- 5. .3MF GENERATION LOGIC (v1.4 - Using THREE.3MFExporter) ---
 
         /**
          * Generates and triggers the download of the .3MF file
@@ -346,9 +346,10 @@
                 return;
             }
 
-            console.log("Generating .3MF file (v1.3 - THREE.3MFExporter)...");
+            console.log("Generating .3MF file (v1.4 - THREE.3MFExporter)...");
 
-            const exporter = new THREE.ThreeMFExporter();
+            // v1.4 FIX: The constructor is THREE.MFExporter, not ThreeMFExporter
+            const exporter = new THREE.MFExporter();
             const scene = new THREE.Scene();
             
             // Cache materials for performance
