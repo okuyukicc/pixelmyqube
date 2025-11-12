@@ -7,6 +7,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
+    <!-- 
+      v1.3: Load three.js libraries
+      We load the main library, the OBJ loader, and the 3MF exporter.
+      We use a specific version (0.128.0) for stability.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/3MFExporter.js"></script>
+
     <!-- Load external stylesheet -->
     <link rel="stylesheet" href="assets/style.css">
 </head>
@@ -34,7 +43,7 @@
                             <div class="color-swatch" data-color="#38A169" style="background-color: #38A169" title="Green"></div>
                             <div class="color-swatch" data-color="#3182CE" style="background-color: #3182CE" title="Blue"></div>
                             <div class="color-swatch" data-color="#FC6D09" style="background-color: #FC6D09" title="Orange"></div>
-                            <div class="color-swatch" data-color="#FFFFFF" style="background-color: #FFFFFF;" title="White"></div>
+                            <div class="color-swatch" data-color="#FFFFFF" style="background-color: #FFFFFF; border: 1px solid #ddd;" title="White"></div>
                             
                             <input type="color" id="color-picker" class="w-10 h-10 p-0 border-none cursor-pointer rounded-full" value="#FF0000">
                         </div>
@@ -76,10 +85,16 @@
 
     <!-- Footer -->
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.2</span>
+        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.3</span>
     </footer>
 
-    <script type="module">
+    <!-- 
+      v1.3: Removed type="module". 
+      The three.js example scripts (OBJLoader, 3MFExporter) are not modules
+      and rely on the global THREE object. This script must not be a module
+      so it can access them.
+    -->
+    <script>
         // --- 1. CONFIGURATION AND INITIALIZATION ---
 
         const GRID_SIZE = 17;
@@ -88,11 +103,7 @@
         const SPACING_MM = 2; // Spacing between objects
         const TOTAL_CELL_DIM_MM = OBJECT_DIM_MM + SPACING_MM; 
         
-        // Scale for the OBJ model.
-        // We assume the OBJ is normalized from -1 to 1 (approx)
-        // (20mm width / 2 units) = 10
-        // (9.40mm height / ~0.94 units) = 10
-        // Adjust these if your model isn't centered or has different proportions
+        // v1.3: Scale is now applied in the OBJLoader callback
         const OBJ_SCALE_X = 10.0;
         const OBJ_SCALE_Y = 10.0;
         const OBJ_SCALE_Z = 10.0; 
@@ -112,7 +123,7 @@
         // 1D array to store the color of each grid cell
         let gridData = new Array(GRID_SIZE * GRID_SIZE).fill(null);
         
-        // Geometry of the loaded model
+        // v1.3: This will store the THREE.BufferGeometry
         let customGeometry = null;
 
         /**
@@ -267,78 +278,51 @@
             selectColor(e.target.value, null);
         });
 
-        // --- 4. .OBJ LOADING AND PROCESSING LOGIC ---
-
-        /**
-         * Parses the text of an .OBJ file
-         * @param {string} objText The text content of the .obj file
-         * @returns {object} An object with { vertices: [], triangles: [] }
-         */
-        function parseOBJ(objText) {
-            const vertices = [];
-            const triangles = [];
-            const lines = objText.split('\n');
-
-            for (const line of lines) {
-                const parts = line.trim().split(/\s+/);
-                const type = parts[0];
-
-                if (type === 'v') {
-                    // Vertex line: v x y z
-                    const x = parseFloat(parts[1]) * OBJ_SCALE_X;
-                    const y = parseFloat(parts[2]) * OBJ_SCALE_Y;
-                    const z = parseFloat(parts[3]) * OBJ_SCALE_Z;
-                    vertices.push({ x, y, z });
-
-                } else if (type === 'f') {
-                    // Face line: f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3
-                    // We assume triangles
-                    const faceVertices = [];
-                    for (let i = 1; i < parts.length; i++) {
-                        const v_parts = parts[i].split('/');
-                        // OBJ index is 1-based, convert to 0-based
-                        faceVertices.push(parseInt(v_parts[0]) - 1);
-                    }
-                    
-                    if (faceVertices.length === 3) {
-                         triangles.push({ v1: faceVertices[0], v2: faceVertices[1], v3: faceVertices[2] });
-                    } 
-                    // Optional: Handle Quads (4-vertex faces) by triangulating them
-                    else if (faceVertices.length === 4) {
-                        triangles.push({ v1: faceVertices[0], v2: faceVertices[1], v3: faceVertices[2] });
-                        triangles.push({ v1: faceVertices[0], v2: faceVertices[2], v3: faceVertices[3] });
-                    }
-                }
-            }
-            
-            console.log(`OBJ model parsed: ${vertices.length} vertices, ${triangles.length} triangles`);
-            return { vertices, triangles };
-        }
+        // --- 4. .OBJ LOADING LOGIC (v1.3 - Using THREE.OBJLoader) ---
 
         /**
          * Loads the .obj model from the server
          */
-        async function loadCustomModel() {
+        function loadCustomModel() {
             try {
                 const objPath = 'assets/pixel.obj';
-                // Build an absolute URL relative to the script's location
-                // This is more robust than just 'assets/pixel.obj'
                 const absoluteObjUrl = new URL(objPath, window.location.href).href;
 
-                const response = await fetch(absoluteObjUrl);
-                if (!response.ok) {
-                    throw new Error(`Error loading '${objPath}': ${response.statusText}. Please ensure 'assets/pixel.obj' exists and is accessible.`);
-                }
-                const objText = await response.text();
-                customGeometry = parseOBJ(objText);
-                
-                // Enable the download button
-                downloadBtn.disabled = false;
-                downloadBtn.textContent = 'Download .3MF';
+                // Use THREE.OBJLoader
+                const loader = new THREE.OBJLoader();
+                loader.load(
+                    // resource URL
+                    absoluteObjUrl,
+                    // onLoad callback
+                    function ( group ) {
+                        // The 'group' is a THREE.Group. We assume the first child
+                        // is the mesh we want.
+                        if (group.children.length > 0) {
+                            customGeometry = group.children[0].geometry;
+                            
+                            // Apply the scale directly to the geometry
+                            customGeometry.scale(OBJ_SCALE_X, OBJ_SCALE_Y, OBJ_SCALE_Z);
+                            
+                            // Enable the download button
+                            downloadBtn.disabled = false;
+                            downloadBtn.textContent = 'Download .3MF';
+                            console.log('Custom model loaded and scaled successfully.');
+                        } else {
+                            throw new Error('OBJ file loaded but contains no geometry.');
+                        }
+                    },
+                    // onProgress callback (optional)
+                    function ( xhr ) {
+                        console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+                    },
+                    // onError callback
+                    function ( error ) {
+                         throw new Error(`Error loading '${objPath}': ${error.message || 'Unknown error'}`);
+                    }
+                );
 
             } catch (error) {
                 console.error(error);
-                // Provide a clearer error message for the common 'file://' issue
                 if (window.location.protocol === 'file:') {
                     alert(`Fatal Error: Could not load the 3D model.\n\nThis page is running from a local 'file://' address. Due to browser security, it cannot load the 'pixel.obj' file.\n\nTo fix this, please run it from a local web server (e.g., 'python -m http.server') or view it on GitHub Pages.`);
                 } else {
@@ -349,12 +333,12 @@
         }
 
 
-        // --- 5. .3MF GENERATION LOGIC (v1.2 - MESH DUPLICATION + DUMMY VERTEX) ---
+        // --- 5. .3MF GENERATION LOGIC (v1.3 - Using THREE.3MFExporter) ---
 
         /**
          * Generates and triggers the download of the .3MF file
          */
-        async function generateAndDownload3MF() {
+        function generateAndDownload3MF() {
             
             // Check if the model is loaded
             if (!customGeometry) {
@@ -362,127 +346,65 @@
                 return;
             }
 
-            console.log("Generating .3MF file (v1.2 - Mesh Duplication + Dummy Vertex)...");
-            const zip = new JSZip();
+            console.log("Generating .3MF file (v1.3 - THREE.3MFExporter)...");
 
-            // --- .rels file (standard) ---
-            const relsXML = `<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-    <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />
-</Relationships>`;
-            zip.folder("_rels").file(".rels", relsXML);
-
-            // --- 3dmodel.model file (the main content) ---
+            const exporter = new THREE.ThreeMFExporter();
+            const scene = new THREE.Scene();
             
-            // 1. Define Materials
-            const uniqueColors = [...new Set(gridData.filter(c => c !== null))];
-            
-            let baseMaterialsXML = `<basematerials id="1">`; // All materials in one group
-            uniqueColors.forEach((color, index) => {
-                const sRGBColor = color.substring(1); // Remove '#'
-                baseMaterialsXML += `\n    <base name="Color ${index}" displaycolor="#${sRGBColor}" />`;
-            });
-            baseMaterialsXML += `\n</basematerials>`;
+            // Cache materials for performance
+            const materialCache = {};
 
-            let resourcesXML = `\n    ${baseMaterialsXML}`;
-            
-            // 2. Define Base Geometry (as XML strings)
-            let baseVerticesXML = `<vertices>`;
-            customGeometry.vertices.forEach(v => {
-                baseVerticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
-            });
-            baseVerticesXML += `\n    </vertices>`;
-
-            let baseTrianglesXML = `<triangles>`;
-            customGeometry.triangles.forEach(t => {
-                baseTrianglesXML += `\n        <triangle v1="${t.v1}" v2="${t.v2}" v3="${t.v3}" />`;
-            });
-            baseTrianglesXML += `\n    </triangles>`;
-
-            // 3. Create ONE <object> per COLOR, each with a *unique* mesh
-            // This is the "cache-busting" trick for slicers.
-            const colorToObjectMap = {}; // Maps a color (e.g., "#E53E3E") to a new object ID (e.g., 2)
-            let objectIdCounter = 2; // Start object IDs from 2 (1 is for basematerials)
-
-            uniqueColors.forEach((color, index) => {
-                const newObjectId = objectIdCounter++;
-                colorToObjectMap[color] = newObjectId; // Map this color to the new ID
-
-                // Create a *unique* vertex list for this color
-                let coloredVerticesXML = baseVerticesXML.replace('</vertices>', ''); // Remove closing tag
-                
-                // Add 'index' number of dummy vertices to make the mesh unique
-                // These vertices are not referenced by any triangle.
-                for (let i = 0; i < index; i++) {
-                    // Add a unique, out-of-bounds vertex
-                    coloredVerticesXML += `\n        <vertex x="0" y="0" z="${-999 - i}" />`;
-                }
-                coloredVerticesXML += `\n    </vertices>`; // Add closing tag back
-
-                // Create an object definition. This object *is* this color.
-                // We assign the material (pid="1") and the specific color (pindex="${index}")
-                // directly to the object definition.
-                resourcesXML += `
-    <object id="${newObjectId}" type="model" pid="1" pindex="${index}">
-        <mesh>
-            ${coloredVerticesXML}
-            ${baseTrianglesXML}
-        </mesh>
-    </object>`;
-            });
-
-            const finalResourcesXML = `<resources>${resourcesXML}\n</resources>`;
-            
-            // 4. Build the scene
-            let buildItemsXML = "";
             const objectCenterOffset = OBJECT_DIM_MM / 2; // Assume the model is centered at 0,0
 
             gridData.forEach((color, index) => {
                 if (color !== null) {
+                    // Get or create material
+                    if (!materialCache[color]) {
+                        materialCache[color] = new THREE.MeshBasicMaterial({ 
+                            color: new THREE.Color(color) 
+                        });
+                    }
+                    const material = materialCache[color];
+
+                    // Create a new mesh for this pixel
+                    // We *must* use the same geometry and a different material
+                    const mesh = new THREE.Mesh(customGeometry, material);
+
                     // Calculate 3D position
                     const x = (index % GRID_SIZE) * TOTAL_CELL_DIM_MM + objectCenterOffset;
                     // Invert Y-axis for 3D build (grid 0,0 is top-left, 3D 0,0 is bottom-left)
                     const y = (GRID_SIZE - 1 - Math.floor(index / GRID_SIZE)) * TOTAL_CELL_DIM_MM + objectCenterOffset; 
                     
-                    const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
+                    mesh.position.set(x, y, 0);
                     
-                    // Get the correct Object ID for this color
-                    const objectIdToPlace = colorToObjectMap[color];
-                    
-                    // Place an item. It doesn't need color info, because the object
-                    // (e.g., objectid="3") is already defined as "red".
-                    buildItemsXML += `\n    <item objectid="${objectIdToPlace}" transform="${transform}" />`;
+                    // Add to the scene
+                    scene.add(mesh);
                 }
             });
-            
-            const buildXML = `<build>${buildItemsXML}\n</build>`;
 
-            // 5. Assemble the final XML
-            const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
-<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel">
-    ${finalResourcesXML}
-    ${buildXML}
-</model>`;
+            // The exporter will process the scene and generate a 3MF file
+            // that correctly lists multiple objects with different materials.
+            exporter.parse(
+                scene, 
+                function ( arrayBuffer ) { // The result is an ArrayBuffer
+                    
+                    const blob = new Blob([arrayBuffer], { type: 'application/zip' });
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = "pixelmyqube_custom.3mf";
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    console.log(".3MF file generated and downloaded!");
 
-            zip.folder("3D").file("3dmodel.model", modelXML);
-
-            // 6. Trigger Download
-            try {
-                const blob = await zip.generateAsync({ type: "blob" });
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = "pixelmyqube_custom.3mf";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                console.log(".3MF file generated and downloaded!");
-
-            } catch (error) {
-                console.error("Error generating the .3mf file:", error);
-                alert("An error occurred while generating the .3mf file. Check the console for more details.");
-            }
+                },
+                function ( error ) {
+                    console.error("Error generating the .3mf file:", error);
+                    alert("An error occurred while generating the .3mf file. Check the console for more details.");
+                }
+            );
         }
 
 
