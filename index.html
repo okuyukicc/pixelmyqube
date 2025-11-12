@@ -350,7 +350,7 @@
         }
 
 
-        // --- 5. .3MF GENERATION LOGIC ---
+        // --- 5. .3MF GENERATION LOGIC (MESH DUPLICATION METHOD) ---
 
         /**
          * Generates and triggers the download of the .3MF file
@@ -363,7 +363,7 @@
                 return;
             }
 
-            console.log("Generating .3MF file with custom model...");
+            console.log("Generating .3MF file (Mesh Duplication Method)...");
             const zip = new JSZip();
 
             // --- .rels file (standard) ---
@@ -385,10 +385,9 @@
             });
             baseMaterialsXML += `\n</basematerials>`;
 
-            
-            // 2. Define ONE base object (the mesh)
             let resourcesXML = `\n    ${baseMaterialsXML}`;
-
+            
+            // 2. Define Geometry (as XML strings)
             let verticesXML = `<vertices>`;
             customGeometry.vertices.forEach(v => {
                 verticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
@@ -401,20 +400,30 @@
             });
             trianglesXML += `\n    </triangles>`;
 
-            // ** THE FIX IS HERE **
-            // The <object> (ID=2) is JUST geometry. It has NO 'pid' (property ID).
-            // This forces the slicer to look at the <item> for color info.
-            resourcesXML += `
-    <object id="2" type="model">
+            // 3. Create ONE <object> per COLOR
+            // This is the robust method slicers understand.
+            const colorToObjectMap = {}; // Maps a color (e.g., "#E53E3E") to a new object ID (e.g., 3)
+            let objectIdCounter = 2; // Start object IDs from 2 (1 is for basematerials)
+
+            uniqueColors.forEach((color, index) => {
+                const newObjectId = objectIdCounter++;
+                colorToObjectMap[color] = newObjectId; // Map this color to the new ID
+
+                // Create an object definition. This object *is* this color.
+                // We assign the material (pid="1") and the specific color (pindex="${index}")
+                // directly to the object definition.
+                resourcesXML += `
+    <object id="${newObjectId}" type="model" pid="1" pindex="${index}">
         <mesh>
             ${verticesXML}
             ${trianglesXML}
         </mesh>
     </object>`;
+            });
 
             const finalResourcesXML = `<resources>${resourcesXML}\n</resources>`;
             
-            // 3. Build the scene with colored items
+            // 4. Build the scene
             let buildItemsXML = "";
             const objectCenterOffset = OBJECT_DIM_MM / 2; // Assume the model is centered at 0,0
 
@@ -427,18 +436,18 @@
                     
                     const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
                     
-                    // Find the color index from our unique list
-                    const colorIndex = uniqueColors.indexOf(color);
+                    // Get the correct Object ID for this color
+                    const objectIdToPlace = colorToObjectMap[color];
                     
-                    // The <item> tag now defines the color property (pid="1")
-                    // and the specific color index (pindex="...")
-                    buildItemsXML += `\n    <item objectid="2" pid="1" pindex="${colorIndex}" transform="${transform}" />`;
+                    // Place an item. It doesn't need color info, because the object
+                    // (e.g., objectid="3") is already defined as "red".
+                    buildItemsXML += `\n    <item objectid="${objectIdToPlace}" transform="${transform}" />`;
                 }
             });
             
             const buildXML = `<build>${buildItemsXML}\n</build>`;
 
-            // 4. Assemble the final XML
+            // 5. Assemble the final XML
             const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel">
     ${finalResourcesXML}
@@ -447,7 +456,7 @@
 
             zip.folder("3D").file("3dmodel.model", modelXML);
 
-            // 5. Trigger Download
+            // 6. Trigger Download
             try {
                 const blob = await zip.generateAsync({ type: "blob" });
                 
