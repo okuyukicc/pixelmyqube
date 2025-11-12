@@ -350,7 +350,7 @@
         }
 
 
-        // --- 5. .3MF GENERATION LOGIC (MESH DUPLICATION METHOD) ---
+        // --- 5. .3MF GENERATION LOGIC (SLICER-COMPATIBLE COMPONENT METHOD) ---
 
         /**
          * Generates and triggers the download of the .3MF file
@@ -363,7 +363,7 @@
                 return;
             }
 
-            console.log("Generating .3MF file (Mesh Duplication Method)...");
+            console.log("Generating .3MF file (Slicer-Compatible Component Method)...");
             const zip = new JSZip();
 
             // --- .rels file (standard) ---
@@ -378,7 +378,7 @@
             // 1. Define Materials
             const uniqueColors = [...new Set(gridData.filter(c => c !== null))];
             
-            let baseMaterialsXML = `<basematerials id="1">`; 
+            let baseMaterialsXML = `<basematerials id="1">`; // All materials in one group
             uniqueColors.forEach((color, index) => {
                 const sRGBColor = color.substring(1); // Remove '#'
                 baseMaterialsXML += `\n    <base name="Color ${index}" displaycolor="#${sRGBColor}" />`;
@@ -387,7 +387,7 @@
 
             let resourcesXML = `\n    ${baseMaterialsXML}`;
             
-            // 2. Define Geometry (as XML strings)
+            // 2. Define ONE base object (the mesh geometry), ID = 2
             let verticesXML = `<vertices>`;
             customGeometry.vertices.forEach(v => {
                 verticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
@@ -400,24 +400,33 @@
             });
             trianglesXML += `\n    </triangles>`;
 
-            // 3. Create ONE <object> per COLOR
-            // This is the robust method slicers understand.
+            // Add the base mesh object (ID=2). It has NO color information.
+            resourcesXML += `
+    <object id="2" type="model">
+        <mesh>
+            ${verticesXML}
+            ${trianglesXML}
+        </mesh>
+    </object>`;
+
+            // 3. Create "Component Objects" (ID 3, 4, 5...)
+            // One for each color. These objects *reference* the base mesh.
             const colorToObjectMap = {}; // Maps a color (e.g., "#E53E3E") to a new object ID (e.g., 3)
-            let objectIdCounter = 2; // Start object IDs from 2 (1 is for basematerials)
+            let objectIdCounter = 3; // Start component objects from 3
 
             uniqueColors.forEach((color, index) => {
                 const newObjectId = objectIdCounter++;
                 colorToObjectMap[color] = newObjectId; // Map this color to the new ID
 
-                // Create an object definition. This object *is* this color.
-                // We assign the material (pid="1") and the specific color (pindex="${index}")
-                // directly to the object definition.
+                // Create a component object. This object's "geometry"
+                // is just a <component> tag pointing to the base mesh (objectid="2").
+                // THIS is where we assign the color, using the material group (pid="1")
+                // and the specific color index (pindex="${index}").
                 resourcesXML += `
-    <object id="${newObjectId}" type="model" pid="1" pindex="${index}">
-        <mesh>
-            ${verticesXML}
-            ${trianglesXML}
-        </mesh>
+    <object id="${newObjectId}" type="model">
+        <components>
+            <component objectid="2" pid="1" pindex="${index}" />
+        </components>
     </object>`;
             });
 
@@ -436,11 +445,12 @@
                     
                     const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
                     
-                    // Get the correct Object ID for this color
+                    // Get the correct "Colored Object" ID (e.g., 3 for red, 4 for green)
                     const objectIdToPlace = colorToObjectMap[color];
                     
-                    // Place an item. It doesn't need color info, because the object
-                    // (e.g., objectid="3") is already defined as "red".
+                    // Place an item. It doesn't need color info here,
+                    // because the object it's placing (e.g., objectid="3")
+                    // is already defined as being "red".
                     buildItemsXML += `\n    <item objectid="${objectIdToPlace}" transform="${transform}" />`;
                 }
             });
