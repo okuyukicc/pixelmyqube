@@ -8,12 +8,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <!-- 
-      v1.9: Consolidated all three.js scripts to use the same CDN (cdnjs)
-      to prevent loading conflicts between different CDNs.
+      v1.10: This is a wild guess.
+      Logs show OBJLoader (from cdnjs) IS working, but 3MFExporter (from cdnjs) IS NOT.
+      We'll keep the working scripts from cdnjs and try loading *only* the failing
+      3MFExporter from a different CDN (jsdelivr) to force a fresh download.
     -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/OBJLoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/exporters/3MFExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/3MFExporter.js"></script> <!-- From jsdelivr -->
 
     <!-- Load external stylesheet -->
     <link rel="stylesheet" href="assets/style.css">
@@ -84,7 +86,7 @@
 
     <!-- Footer -->
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.9</span>
+        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.10</span>
     </footer>
 
     <!-- 
@@ -346,7 +348,7 @@
                 return;
             }
 
-            console.log("Generating .3MF file (v1.9 - THREE.3MFExporter)...");
+            console.log("Generating .3MF file (v1.10 - THREE.3MFExporter)...");
 
             // With r128, this constructor is correct
             const exporter = new THREE.ThreeMFExporter();
