@@ -8,13 +8,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <!-- 
-      v1.3: Load three.js libraries
-      We load the main library, the OBJ loader, and the 3MF exporter.
-      We use a specific version (0.128.0) for stability.
+      v1.7: Upgraded three.js version to 0.150.1 from jsdelivr
+      This should resolve any script loading inconsistencies.
     -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/3MFExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/exporters/3MFExporter.js"></script>
 
     <!-- Load external stylesheet -->
     <link rel="stylesheet" href="assets/style.css">
@@ -85,11 +84,11 @@
 
     <!-- Footer -->
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.5</span>
+        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.7</span>
     </footer>
 
     <!-- 
-      v1.3: Removed type="module". 
+      This script CANNOT be type="module".
       The three.js example scripts (OBJLoader, 3MFExporter) are not modules
       and rely on the global THREE object. This script must not be a module
       so it can access them.
@@ -103,7 +102,7 @@
         const SPACING_MM = 2; // Spacing between objects
         const TOTAL_CELL_DIM_MM = OBJECT_DIM_MM + SPACING_MM; 
         
-        // v1.3: Scale is now applied in the OBJLoader callback
+        // Scale is now applied in the OBJLoader callback
         const OBJ_SCALE_X = 10.0;
         const OBJ_SCALE_Y = 10.0;
         const OBJ_SCALE_Z = 10.0; 
@@ -123,7 +122,7 @@
         // 1D array to store the color of each grid cell
         let gridData = new Array(GRID_SIZE * GRID_SIZE).fill(null);
         
-        // v1.3: This will store the THREE.BufferGeometry
+        // This will store the THREE.BufferGeometry
         let customGeometry = null;
 
         /**
@@ -278,7 +277,7 @@
             selectColor(e.target.value, null);
         });
 
-        // --- 4. .OBJ LOADING LOGIC (v1.3 - Using THREE.OBJLoader) ---
+        // --- 4. .OBJ LOADING LOGIC (Using THREE.OBJLoader) ---
 
         /**
          * Loads the .obj model from the server
@@ -333,7 +332,7 @@
         }
 
 
-        // --- 5. .3MF GENERATION LOGIC (v1.4 - Using THREE.3MFExporter) ---
+        // --- 5. .3MF GENERATION LOGIC (Using THREE.3MFExporter) ---
 
         /**
          * Generates and triggers the download of the .3MF file
@@ -346,9 +345,9 @@
                 return;
             }
 
-            console.log("Generating .3MF file (v1.5 - THREE.3MFExporter)...");
+            console.log("Generating .3MF file (v1.7 - THREE.3MFExporter)...");
 
-            // v1.5 FIX: The constructor IS THREE.ThreeMFExporter. My previous fix was wrong.
+            // v1.7: Using the correct constructor name
             const exporter = new THREE.ThreeMFExporter();
             const scene = new THREE.Scene();
             
