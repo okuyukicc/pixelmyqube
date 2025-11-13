@@ -5,18 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>pixelmyqube</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <!-- 
-      v1.11: Reverting ALL scripts to jsdelivr CDN (a single source)
-      to prevent cross-CDN conflicts and hopefully fix the loader errors.
+      v1.12: Added 'defer' to all library scripts.
+      This should fix any race conditions by ensuring the DOM is parsed
+      before scripts execute, and that they execute in the correct order.
     -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/3MFExporter.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/3MFExporter.js" defer></script>
 
-    <!-- Load external stylesheet with a cache-busting query string -->
-    <link rel="stylesheet" href="assets/style.css?v=1.11">
+    <!-- Load external stylesheet with a new cache-busting query string -->
+    <link rel="stylesheet" href="assets/style.css?v=1.12">
 </head>
 <body class="bg-black font-sans flex flex-col items-center justify-center min-h-screen p-4">
 
@@ -84,14 +85,13 @@
 
     <!-- Footer -->
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.11</span>
+        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.12</span>
     </footer>
 
     <!-- 
       This script CANNOT be type="module".
-      The three.js example scripts (OBJLoader, 3MFExporter) are not modules
-      and rely on the global THREE object. This script must not be a module
-      so it can access them.
+      The 'defer' attribute on the head scripts ensures that this script
+      will only run *after* they have been loaded and executed.
     -->
     <script>
         // --- 1. CONFIGURATION AND INITIALIZATION ---
@@ -346,7 +346,7 @@
                 return;
             }
 
-            console.log("Generating .3MF file (v1.11 - THREE.3MFExporter)...");
+            console.log(`Generating .3MF file (v${document.querySelector('footer span').textContent.trim()} - THREE.3MFExporter)...`);
 
             // With r128, this constructor is correct
             const exporter = new THREE.ThreeMFExporter();
@@ -411,15 +411,35 @@
 
         // --- 6. APP INITIALIZATION ---
         
-        clearBtn.addEventListener('click', clearGrid);
-        downloadBtn.addEventListener('click', generateAndDownload3MF);
+        // We must wait for the DOM to be ready before running our script,
+        // especially since the main scripts are 'deferred'.
+        document.addEventListener('DOMContentLoaded', (event) => {
+            // All the initialization code that depends on THREE or DOM elements
+            // should go here, but since the button clicks are user-initiated,
+            // we can be reasonably sure THREE is loaded.
+            // The main thing is to call loadCustomModel *after* THREE is ready.
+            
+            // This is a small hack to wait until the 'defer' scripts are loaded
+            // We check if THREE is loaded. If not, wait a tiny bit.
+            function checkThreeReady() {
+                if (typeof THREE !== 'undefined' && THREE.OBJLoader) {
+                    // Start loading the .OBJ model as soon as THREE is ready
+                    loadCustomModel();
+                } else {
+                    // Check again shortly
+                    setTimeout(checkThreeReady, 50);
+                }
+            }
 
-        createGrid();
-        updateStats();
-        selectColor('null', document.querySelector('.color-swatch[data-color="null"]'));
+            clearBtn.addEventListener('click', clearGrid);
+            downloadBtn.addEventListener('click', generateAndDownload3MF);
+
+            createGrid();
+            updateStats();
+            selectColor('null', document.querySelector('.color-swatch[data-color="null"]'));
         
-        // Start loading the .OBJ model as soon as the page runs
-        loadCustomModel();
+            checkThreeReady();
+        });
 
     </script>
 </body>
