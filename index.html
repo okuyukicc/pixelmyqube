@@ -8,12 +8,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <!-- 
-      v1.7: Upgraded three.js version to 0.150.1 from jsdelivr
-      This should resolve any script loading inconsistencies.
+      v1.8: Downgraded three.js to r128 (0.128.0).
+      Version r150+ has breaking changes with how example scripts are loaded.
+      r128 is rock-solid and compatible with this method (global scripts).
     -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/OBJLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/exporters/3MFExporter.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/3MFExporter.js"></script>
 
     <!-- Load external stylesheet -->
     <link rel="stylesheet" href="assets/style.css">
@@ -84,7 +85,7 @@
 
     <!-- Footer -->
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.7</span>
+        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.8</span>
     </footer>
 
     <!-- 
@@ -285,9 +286,10 @@
         function loadCustomModel() {
             try {
                 const objPath = 'assets/pixel.obj';
+                // We construct an absolute URL to be safe
                 const absoluteObjUrl = new URL(objPath, window.location.href).href;
 
-                // Use THREE.OBJLoader
+                // Use THREE.OBJLoader (this should now be defined)
                 const loader = new THREE.OBJLoader();
                 loader.load(
                     // resource URL
@@ -345,9 +347,9 @@
                 return;
             }
 
-            console.log("Generating .3MF file (v1.7 - THREE.3MFExporter)...");
+            console.log("Generating .3MF file (v1.8 - THREE.3MFExporter)...");
 
-            // v1.7: Using the correct constructor name
+            // With r128, this constructor is correct
             const exporter = new THREE.ThreeMFExporter();
             const scene = new THREE.Scene();
             
