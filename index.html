@@ -7,28 +7,17 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- 
-      v1.13: STOP FIGHTING. Use modern ES Modules.
-      This is the definitive, correct way to load three.js in 2024.
-      It uses an importmap to tell the browser where to find the 'three' module
-      and its addons. This completely avoids all the '...is not a constructor'
-      errors caused by script load order and globals.
+      v1.14: Back to r128 with 'defer' and a CORRECTED ready-check.
+      This version uses the stable r128 scripts and waits for ALL of them
+      to be loaded before enabling the app, fixing the race condition.
     -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/3MFExporter.js" defer></script>
 
-    <!-- JSZip must be loaded as a global, as it is not an ES Module. -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-    <!-- This "importmap" tells the browser where to find the modules -->
-    <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-      }
-    }
-    </script>
-
-    <!-- Load external stylesheet -->
-    <link rel="stylesheet" href="assets/style.css?v=1.13">
+    <!-- Load external stylesheet with a new cache-busting query string -->
+    <link rel="stylesheet" href="assets/style.css?v=1.14">
 </head>
 <body class="bg-black font-sans flex flex-col items-center justify-center min-h-screen p-4">
 
@@ -66,7 +55,7 @@
                             Clear Grid
                         </button>
                         <button id="download-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors" disabled>
-                            Loading model...
+                            Loading libraries...
                         </button>
                     </div>
 
@@ -96,23 +85,15 @@
 
     <!-- Footer -->
     <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.13</span>
+        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span class="ml-2 font-semibold">v1.14</span>
     </footer>
 
     <!-- 
-      This script is now type="module".
-      This allows us to use 'import' statements.
-      It is also 'deferred' by default, so we don't need DOMContentLoaded.
+      This script CANNOT be type="module".
+      The 'defer' attribute on the head scripts ensures that this script
+      will only run *after* they have been loaded and executed.
     -->
-    <script type="module">
-        // Import the libraries from the importmap
-        import * as THREE from 'three';
-        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-        import { ThreeMFExporter } from 'three/addons/exporters/3MFExporter.js';
-        
-        // JSZip is a global, so we grab it from the window object
-        const JSZip = window.JSZip;
-
+    <script>
         // --- 1. CONFIGURATION AND INITIALIZATION ---
 
         const GRID_SIZE = 17;
@@ -307,8 +288,8 @@
                 // We construct an absolute URL to be safe
                 const absoluteObjUrl = new URL(objPath, window.location.href).href;
 
-                // Use OBJLoader (imported from modules)
-                const loader = new OBJLoader();
+                // Use THREE.OBJLoader (this should now be defined)
+                const loader = new THREE.OBJLoader();
                 loader.load(
                     // resource URL
                     absoluteObjUrl,
@@ -367,8 +348,8 @@
 
             console.log(`Generating .3MF file (v${document.querySelector('footer span').textContent.trim()} - THREE.3MFExporter)...`);
 
-            // Use ThreeMFExporter (imported from modules)
-            const exporter = new ThreeMFExporter();
+            // With r128, this constructor is correct
+            const exporter = new THREE.ThreeMFExporter();
             const scene = new THREE.Scene();
             
             // Cache materials for performance
@@ -380,7 +361,7 @@
                 if (color !== null) {
                     // Get or create material
                     if (!materialCache[color]) {
-                        // Use MeshStandardMaterial for better compatibility with 3MF
+                        // Use MeshStandardMaterial for better compatibility
                         materialCache[color] = new THREE.MeshStandardMaterial({ 
                             color: new THREE.Color(color) 
                         });
@@ -425,27 +406,59 @@
                     console.error("Error generating the .3mf file:", error);
                     alert("An error occurred while generating the .3mf file. Check the console for more details.");
                 },
-                // IMPORTANT: Pass JSZip to the exporter options
-                { jszip: JSZip }
+                // IMPORTANT: Pass JSZip to the exporter
+                { jszip: window.JSZip }
             );
         }
 
 
         // --- 6. APP INITIALIZATION ---
         
-        // Since this is a module, it runs after the DOM is parsed.
-        // We can safely add listeners and call init functions.
+        // We must wait for the DOM to be ready before running our script,
+        // especially since the main scripts are 'deferred'.
+        document.addEventListener('DOMContentLoaded', (event) => {
+            
+            // THIS IS THE FIX.
+            // We wait until ALL required libraries are attached to the window object.
+            function checkLibrariesReady() {
+                if (typeof THREE !== 'undefined' && 
+                    THREE.OBJLoader && 
+                    THREE.ThreeMFExporter && 
+                    window.JSZip) 
+                {
+                    // All libraries are loaded. Start the app.
+                    console.log("All libraries loaded (THREE, OBJLoader, 3MFExporter, JSZip).");
+                    initializeApp();
+                } else {
+                    // Check again shortly
+                    let missing = [
+                        (typeof THREE === 'undefined') ? 'THREE' : '',
+                        (typeof THREE !== 'undefined' && !THREE.OBJLoader) ? 'OBJLoader' : '',
+                        (typeof THREE !== 'undefined' && !THREE.ThreeMFExporter) ? '3MFExporter' : '',
+                        (!window.JSZip) ? 'JSZip' : ''
+                    ].filter(Boolean).join(', ');
+                    
+                    console.log(`Waiting for libraries to load... Missing: ${missing}`);
+                    downloadBtn.textContent = `Loading: ${missing}...`;
+                    setTimeout(checkLibrariesReady, 100);
+                }
+            }
 
-        clearBtn.addEventListener('click', clearGrid);
-        downloadBtn.addEventListener('click', generateAndDownload3MF);
+            function initializeApp() {
+                clearBtn.addEventListener('click', clearGrid);
+                downloadBtn.addEventListener('click', generateAndDownload3MF);
 
-        createGrid();
-        updateStats();
-        selectColor('null', document.querySelector('.color-swatch[data-color="null"]'));
-        
-        // Start loading the .OBJ model
-        // This is safe to call now because all imports are resolved.
-        loadCustomModel();
+                createGrid();
+                updateStats();
+                selectColor('null', document.querySelector('.color-swatch[data-color="null"]'));
+            
+                // Now we can safely load the model
+                loadCustomModel(); // This will enable the download button when ready
+            }
+
+            // Start the check
+            checkLibrariesReady();
+        });
 
     </script>
 </body>
