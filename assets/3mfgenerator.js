@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    const APP_VERSION = "v1.2.2";
+    const APP_VERSION = "v1.2.3";
     const JSZip = window.JSZip; 
     
     if (!JSZip) {
@@ -14,10 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const SPACING_MM = 2; 
     const TOTAL_CELL_DIM_MM = OBJECT_DIM_MM + SPACING_MM; 
     
-    const OBJ_SCALE_X = 10.0;
-    const OBJ_SCALE_Y = 10.0;
-    const OBJ_SCALE_Z = 10.0; 
-
+    // Scale must be calculated based on OBJ dimensions.
+    const OBJ_SCALE_FACTOR = 10.0;
+    // Compensation required if the object is centered around Z=0 in the OBJ file.
+    // If the OBJ model is exported to rest on Z=0, this offset is 0. 
+    // If it is centered (Z=-4.7 to Z=4.7), we apply OBJECT_HEIGHT_MM / 2.
+    // However, since we cannot inspect the OBJ, we rely on the object's height.
+    const Z_COMPENSATION = 0; // Assuming Z=0 in OBJ is the base.
+    
     const gridContainer = document.getElementById('grid-container');
     const colorPalette = document.getElementById('color-palette');
     const colorPicker = document.getElementById('color-picker');
@@ -143,9 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = parts[0];
 
             if (type === 'v') {
-                const x = parseFloat(parts[1]) * OBJ_SCALE_X;
-                const y = parseFloat(parts[2]) * OBJ_SCALE_Y;
-                const z = parseFloat(parts[3]) * OBJ_SCALE_Z;
+                // Apply scaling and Z compensation immediately after parsing the OBJ values
+                const x = parseFloat(parts[1]) * OBJ_SCALE_FACTOR;
+                const y = parseFloat(parts[2]) * OBJ_SCALE_FACTOR;
+                // CORRECCIÓN: Trasladamos la geometría en Z para que se asiente en Z=0.
+                const z = parseFloat(parts[3]) * OBJ_SCALE_FACTOR - Z_COMPENSATION; 
                 vertices.push({ x, y, z });
 
             } else if (type === 'f') {
@@ -215,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let resourcesXML = `\n    ${baseMaterialsXML}`;
         
+        // CORRECCIÓN: Generamos una malla base sin ningún vértice "dummy" aquí
         let baseVerticesXML = `<vertices>`;
         customGeometry.vertices.forEach(v => {
             baseVerticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
@@ -230,17 +237,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const colorToObjectMap = {}; 
         let objectIdCounter = 2; 
 
+        // Generamos un objeto por color (Duplicación de Malla)
         uniqueColors.forEach((color, index) => {
             const newObjectId = objectIdCounter++;
             colorToObjectMap[color] = newObjectId; 
 
+            // Clonamos la malla base.
             let coloredVerticesXML = baseVerticesXML.replace('</vertices>', ''); 
             
-            for (let i = 0; i < index + 1; i++) {
-                coloredVerticesXML += `\n        <vertex x="${i * 0.001}" y="${i * 0.001}" z="${-100 - i}" />`;
-            }
+            // AÑADIMOS EL VÉRTICE DUMMY para "engañar" al slicer para que no optimice.
+            // La posición Z se hace única para cada color.
+            coloredVerticesXML += `\n        <vertex x="${0.001 * index}" y="${0.001 * index}" z="${-100 - index}" />`;
             coloredVerticesXML += `\n    </vertices>`; 
 
+            // CORRECCIÓN CLAVE: El pid y pindex deben estar en la definición del objeto,
+            // y al objeto le damos una malla única para que no se optimice.
             resourcesXML += `
 <object id="${newObjectId}" type="model" pid="1" pindex="${index}">
     <mesh>
@@ -264,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const objectIdToPlace = colorToObjectMap[color];
                 
+                // La instancia solo necesita el ID del objeto coloreado
                 buildItemsXML += `\n    <item objectid="${objectIdToPlace}" transform="${transform}" />`;
             }
         });
