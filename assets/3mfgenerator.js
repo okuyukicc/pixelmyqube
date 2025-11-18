@@ -1,27 +1,24 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    const APP_VERSION = "v1.2.3";
-    const JSZip = window.JSZip; 
+    const APP_VERSION = "v1.2.4 - Z-Fix & Perturbation";
     
+    // --- GLOBALS ---
+    const JSZip = window.JSZip;
     if (!JSZip) {
         alert("Fatal Error: JSZip library not found.");
         return;
     }
 
+    // --- CONFIGURATION ---
     const GRID_SIZE = 17;
-    const OBJECT_DIM_MM = 20;
-    const OBJECT_HEIGHT_MM = 9.40;
+    const OBJECT_DIM_MM = 20; 
     const SPACING_MM = 2; 
     const TOTAL_CELL_DIM_MM = OBJECT_DIM_MM + SPACING_MM; 
     
-    // Scale must be calculated based on OBJ dimensions.
-    const OBJ_SCALE_FACTOR = 10.0;
-    // Compensation required if the object is centered around Z=0 in the OBJ file.
-    // If the OBJ model is exported to rest on Z=0, this offset is 0. 
-    // If it is centered (Z=-4.7 to Z=4.7), we apply OBJECT_HEIGHT_MM / 2.
-    // However, since we cannot inspect the OBJ, we rely on the object's height.
-    const Z_COMPENSATION = 0; // Assuming Z=0 in OBJ is the base.
-    
+    // Scale for OBJ
+    const OBJ_SCALE = 10.0; 
+
+    // --- DOM ELEMENTS ---
     const gridContainer = document.getElementById('grid-container');
     const colorPalette = document.getElementById('color-palette');
     const colorPicker = document.getElementById('color-picker');
@@ -31,10 +28,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const statsColorsEl = document.getElementById('pixel-count-colors');
     const versionSpan = document.getElementById('app-version');
 
+    // --- STATE ---
     let selectedColor = "null"; 
     let isMouseDown = false; 
     let gridData = new Array(GRID_SIZE * GRID_SIZE).fill(null);
-    let customGeometry = null;
+    
+    // Stores the raw geometry from OBJ
+    let rawGeometry = null; // { vertices: [{x,y,z}], triangles: [{v1,v2,v3}] }
+
+    // --- 1. UI & INTERACTION FUNCTIONS ---
 
     function createGrid() {
         gridContainer.innerHTML = ''; 
@@ -47,15 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
             pixelInner.classList.add('pixel-inner');
             pixel.appendChild(pixelInner);
             
-            pixel.addEventListener('mousedown', (e) => {
+            pixel.addEventListener('mousedown', () => {
                 isMouseDown = true;
                 paintPixel(pixelInner, i);
             });
-            
-            pixel.addEventListener('mouseover', (e) => {
-                if (isMouseDown) {
-                    paintPixel(pixelInner, i);
-                }
+            pixel.addEventListener('mouseover', () => {
+                if (isMouseDown) paintPixel(pixelInner, i);
             });
             
             gridContainer.appendChild(pixel);
@@ -64,16 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function paintPixel(pixelInnerElement, index) {
         const newColor = selectedColor === "null" ? null : selectedColor;
-        
         if (gridData[index] !== newColor) {
             gridData[index] = newColor;
             pixelInnerElement.style.backgroundColor = newColor || 'transparent';
             
-            if (newColor === null) {
-                pixelInnerElement.classList.remove('painted');
-            } else {
-                pixelInnerElement.classList.add('painted');
-            }
+            if (newColor === null) pixelInnerElement.classList.remove('painted');
+            else pixelInnerElement.classList.add('painted');
+            
             updateStats();
         }
     }
@@ -81,32 +77,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearGrid() {
         gridData.fill(null);
         const pixelsInner = gridContainer.querySelectorAll('.pixel-inner');
-        pixelsInner.forEach(pixelInner => {
-            pixelInner.style.backgroundColor = 'transparent';
-            pixelInner.classList.remove('painted');
+        pixelsInner.forEach(p => {
+            p.style.backgroundColor = 'transparent';
+            p.classList.remove('painted');
         });
         updateStats();
     }
 
     function updateStats() {
-        const paintedPixels = gridData.filter(color => color !== null);
-        const totalCount = paintedPixels.length;
-        
-        statsTotalEl.textContent = `Total: ${totalCount} pixels`;
+        const paintedPixels = gridData.filter(c => c !== null);
+        statsTotalEl.textContent = `Total: ${paintedPixels.length} pixels`;
         
         const colorCounts = {};
-        paintedPixels.forEach(color => {
-            colorCounts[color] = (colorCounts[color] || 0) + 1;
-        });
+        paintedPixels.forEach(c => colorCounts[c] = (colorCounts[c] || 0) + 1);
         
         statsColorsEl.innerHTML = ''; 
-        const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
-        
-        if (sortedColors.length === 0) {
-            statsColorsEl.innerHTML = '<p class="text-gray-500">No pixels painted.</p>';
-        } else {
-            sortedColors.forEach(color => {
-                const count = colorCounts[color];
+        Object.keys(colorCounts)
+            .sort((a, b) => colorCounts[b] - colorCounts[a])
+            .forEach(color => {
                 const row = document.createElement('div');
                 row.className = 'flex items-center justify-between';
                 row.innerHTML = `
@@ -114,219 +102,210 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="w-3 h-3 rounded-full border border-gray-300" style="background-color: ${color}"></div>
                         <span>${color}</span>
                     </div>
-                    <span class="font-medium">${count}</span>
+                    <span class="font-medium">${colorCounts[color]}</span>
                 `;
                 statsColorsEl.appendChild(row);
             });
-        }
     }
 
     function selectColor(newColor, activeSwatch) {
         selectedColor = newColor;
-        
-        colorPalette.querySelectorAll('.color-swatch').forEach(swatch => {
-            swatch.classList.remove('active');
-        });
-        
-        if (activeSwatch) {
-            activeSwatch.classList.add('active');
-        }
-        
-        if (newColor !== 'null' && !activeSwatch) {
-            colorPicker.value = newColor;
-        }
+        colorPalette.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+        if (activeSwatch) activeSwatch.classList.add('active');
+        if (newColor !== 'null' && !activeSwatch) colorPicker.value = newColor;
     }
 
-    function parseOBJ(objText) {
+    // --- 2. GEOMETRY PROCESSING (OBJ PARSER & Z-FIX) ---
+
+    function parseAndNormalizeOBJ(objText) {
         const vertices = [];
         const triangles = [];
         const lines = objText.split('\n');
 
+        // 1. Parse Raw
         for (const line of lines) {
             const parts = line.trim().split(/\s+/);
-            const type = parts[0];
-
-            if (type === 'v') {
-                // Apply scaling and Z compensation immediately after parsing the OBJ values
-                const x = parseFloat(parts[1]) * OBJ_SCALE_FACTOR;
-                const y = parseFloat(parts[2]) * OBJ_SCALE_FACTOR;
-                // CORRECCIÓN: Trasladamos la geometría en Z para que se asiente en Z=0.
-                const z = parseFloat(parts[3]) * OBJ_SCALE_FACTOR - Z_COMPENSATION; 
-                vertices.push({ x, y, z });
-
-            } else if (type === 'f') {
-                const faceVertices = [];
-                for (let i = 1; i < parts.length; i++) {
-                    const v_parts = parts[i].split('/');
-                    faceVertices.push(parseInt(v_parts[0]) - 1);
-                }
-                
-                if (faceVertices.length === 3) {
-                     triangles.push({ v1: faceVertices[0], v2: faceVertices[1], v3: faceVertices[2] });
-                } 
-                else if (faceVertices.length === 4) {
-                    triangles.push({ v1: faceVertices[0], v2: faceVertices[1], v3: faceVertices[2] });
-                    triangles.push({ v1: faceVertices[0], v2: faceVertices[2], v3: faceVertices[3] });
+            if (parts[0] === 'v') {
+                vertices.push({
+                    x: parseFloat(parts[1]),
+                    y: parseFloat(parts[2]),
+                    z: parseFloat(parts[3])
+                });
+            } else if (parts[0] === 'f') {
+                const faceIndices = parts.slice(1).map(p => parseInt(p.split('/')[0]) - 1);
+                // Triangulate fans manually if needed (simple method for convex polys)
+                for (let i = 1; i < faceIndices.length - 1; i++) {
+                    triangles.push({
+                        v1: faceIndices[0],
+                        v2: faceIndices[i],
+                        v3: faceIndices[i+1]
+                    });
                 }
             }
         }
-        
-        return { vertices, triangles };
+
+        // 2. Calculate Z-Min for Grounding
+        let minZ = Infinity;
+        vertices.forEach(v => {
+            if (v.z < minZ) minZ = v.z;
+        });
+
+        // 3. Normalize (Scale & Shift Z to 0)
+        // We apply scale AND subtract minZ so the object sits perfectly on the bed.
+        const processedVertices = vertices.map(v => ({
+            x: v.x * OBJ_SCALE,
+            y: v.y * OBJ_SCALE,
+            z: (v.z - minZ) * OBJ_SCALE // This shifts the lowest point to 0
+        }));
+
+        return { vertices: processedVertices, triangles: triangles };
     }
 
     async function loadCustomModel() {
         try {
-            const objPath = 'assets/pixel.obj';
-            const absoluteObjUrl = new URL(objPath, window.location.href).href;
-
-            const response = await fetch(absoluteObjUrl);
-            if (!response.ok) {
-                throw new Error('Failed to load OBJ');
-            }
-            const objText = await response.text();
-            customGeometry = parseOBJ(objText);
+            const response = await fetch('assets/pixel.obj');
+            if (!response.ok) throw new Error('OBJ fetch failed');
+            const text = await response.text();
+            
+            rawGeometry = parseAndNormalizeOBJ(text);
             
             downloadBtn.disabled = false;
             downloadBtn.textContent = 'Download .3MF';
-
-        } catch (error) {
-            console.error(error);
-            alert("Error loading assets/pixel.obj. Check console.");
+        } catch (e) {
+            console.error(e);
+            // If local, provide help message
+            if (window.location.protocol === 'file:') {
+                alert("Error: Cannot load local files directly. Please use a local server or GitHub Pages.");
+            } else {
+                alert("Error loading assets/pixel.obj");
+            }
             downloadBtn.textContent = 'Error loading model';
         }
     }
 
+    // --- 3. 3MF GENERATION CORE ---
+
     async function generateAndDownload3MF() {
-        
-        if (!customGeometry) {
-            return;
-        }
+        if (!rawGeometry) return;
 
         const zip = new JSZip();
 
+        // A. The Relationships file
         const relsXML = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />
+    <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />
 </Relationships>`;
         zip.folder("_rels").file(".rels", relsXML);
 
+        // B. The 3D Model file
         const uniqueColors = [...new Set(gridData.filter(c => c !== null))];
         
-        let baseMaterialsXML = `<basematerials id="1">`; 
-        uniqueColors.forEach((color, index) => {
-            const sRGBColor = color.substring(1); 
-            baseMaterialsXML += `\n    <base name="Color ${index}" displaycolor="#${sRGBColor}" />`;
+        // B1. Materials Definition
+        let materialsXML = `<basematerials id="1">`;
+        uniqueColors.forEach((c, i) => {
+            materialsXML += `\n    <base name="Color ${i}" displaycolor="${c}" />`;
         });
-        baseMaterialsXML += `\n</basematerials>`;
+        materialsXML += `\n</basematerials>`;
 
-        let resourcesXML = `\n    ${baseMaterialsXML}`;
-        
-        // CORRECCIÓN: Generamos una malla base sin ningún vértice "dummy" aquí
-        let baseVerticesXML = `<vertices>`;
-        customGeometry.vertices.forEach(v => {
-            baseVerticesXML += `\n        <vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
-        });
-        baseVerticesXML += `\n    </vertices>`;
+        // B2. Object Definitions (Mesh Duplication + Micro-Perturbation)
+        // We create a unique Object Definition for EACH color.
+        // We slightly shift vertices to force the slicer to treat them as unique meshes.
+        let objectsXML = "";
+        const colorToObjID = {};
+        let objIdCounter = 2;
 
-        let baseTrianglesXML = `<triangles>`;
-        customGeometry.triangles.forEach(t => {
-            baseTrianglesXML += `\n        <triangle v1="${t.v1}" v2="${t.v2}" v3="${t.v3}" />`;
-        });
-        baseTrianglesXML += `\n    </triangles>`;
+        uniqueColors.forEach((color, colIndex) => {
+            const objID = objIdCounter++;
+            colorToObjID[color] = objID;
 
-        const colorToObjectMap = {}; 
-        let objectIdCounter = 2; 
+            // Generate perturbed vertices for this specific color
+            // Shift amount: 0.0001mm * colIndex (imperceptible but mathematically distinct)
+            let vertStr = "";
+            rawGeometry.vertices.forEach(v => {
+                const shift = 0.0001 * colIndex;
+                vertStr += `\n<vertex x="${v.x + shift}" y="${v.y + shift}" z="${v.z + shift}" />`;
+            });
 
-        // Generamos un objeto por color (Duplicación de Malla)
-        uniqueColors.forEach((color, index) => {
-            const newObjectId = objectIdCounter++;
-            colorToObjectMap[color] = newObjectId; 
+            let triStr = "";
+            rawGeometry.triangles.forEach(t => {
+                triStr += `\n<triangle v1="${t.v1}" v2="${t.v2}" v3="${t.v3}" />`;
+            });
 
-            // Clonamos la malla base.
-            let coloredVerticesXML = baseVerticesXML.replace('</vertices>', ''); 
-            
-            // AÑADIMOS EL VÉRTICE DUMMY para "engañar" al slicer para que no optimice.
-            // La posición Z se hace única para cada color.
-            coloredVerticesXML += `\n        <vertex x="${0.001 * index}" y="${0.001 * index}" z="${-100 - index}" />`;
-            coloredVerticesXML += `\n    </vertices>`; 
-
-            // CORRECCIÓN CLAVE: El pid y pindex deben estar en la definición del objeto,
-            // y al objeto le damos una malla única para que no se optimice.
-            resourcesXML += `
-<object id="${newObjectId}" type="model" pid="1" pindex="${index}">
+            // Define the object with PID/PINDEX strictly on the Object tag
+            objectsXML += `
+<object id="${objID}" type="model" pid="1" pindex="${colIndex}">
     <mesh>
-        ${coloredVerticesXML}
-        ${baseTrianglesXML}
+        <vertices>${vertStr}\n</vertices>
+        <triangles>${triStr}\n</triangles>
     </mesh>
 </object>`;
         });
 
-        const finalResourcesXML = `<resources>${resourcesXML}\n</resources>`;
-        
-        let buildItemsXML = "";
-        const objectCenterOffset = OBJECT_DIM_MM / 2; 
+        // B3. Build Items
+        let itemsXML = "";
+        const objectCenterOffset = OBJECT_DIM_MM / 2;
 
         gridData.forEach((color, index) => {
             if (color !== null) {
                 const x = (index % GRID_SIZE) * TOTAL_CELL_DIM_MM + objectCenterOffset;
-                const y = (GRID_SIZE - 1 - Math.floor(index / GRID_SIZE)) * TOTAL_CELL_DIM_MM + objectCenterOffset; 
+                const y = (GRID_SIZE - 1 - Math.floor(index / GRID_SIZE)) * TOTAL_CELL_DIM_MM + objectCenterOffset;
                 
-                const transform = `1 0 0 0 1 0 0 0 1 ${x} ${y} 0`;
+                const objID = colorToObjID[color];
                 
-                const objectIdToPlace = colorToObjectMap[color];
-                
-                // La instancia solo necesita el ID del objeto coloreado
-                buildItemsXML += `\n    <item objectid="${objectIdToPlace}" transform="${transform}" />`;
+                // Simply place the pre-colored object
+                itemsXML += `\n<item objectid="${objID}" transform="1 0 0 0 1 0 0 0 1 ${x} ${y} 0" />`;
             }
         });
-        
-        const buildXML = `<build>${buildItemsXML}\n</build>`;
 
         const modelXML = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel">
-${finalResourcesXML}
-${buildXML}
+    <resources>
+        ${materialsXML}
+        ${objectsXML}
+    </resources>
+    <build>
+        ${itemsXML}
+    </build>
 </model>`;
 
         zip.folder("3D").file("3dmodel.model", modelXML);
 
+        // C. Content Types
+        const contentTypesXML = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />
+    <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />
+</Types>`;
+        zip.file("[Content_Types].xml", contentTypesXML);
+
+        // D. Generate Zip
         try {
             const blob = await zip.generateAsync({ type: "blob" });
-            
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = "pixelmyqube_custom.3mf";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-        } catch (error) {
-            alert("Error generating .3mf");
+        } catch (e) {
+            console.error(e);
+            alert("Error generating ZIP");
         }
     }
 
-    if (versionSpan) {
-        versionSpan.textContent = APP_VERSION;
-    }
 
-    window.addEventListener('mouseup', () => {
-        isMouseDown = false;
-    });
-    gridContainer.addEventListener('mouseleave', () => {
-        isMouseDown = false;
-    });
+    // --- 4. INITIALIZATION ---
+    if (versionSpan) versionSpan.textContent = APP_VERSION;
+
+    window.addEventListener('mouseup', () => isMouseDown = false);
+    gridContainer.addEventListener('mouseleave', () => isMouseDown = false);
 
     colorPalette.addEventListener('click', (e) => {
-        const swatch = e.target.closest('.color-swatch');
-        if (swatch) {
-            const color = swatch.dataset.color;
-            selectColor(color, swatch);
-        }
+        const s = e.target.closest('.color-swatch');
+        if (s) selectColor(s.dataset.color, s);
     });
-
-    colorPicker.addEventListener('input', (e) => {
-        selectColor(e.target.value, null);
-    });
+    
+    colorPicker.addEventListener('input', (e) => selectColor(e.target.value, null));
 
     clearBtn.addEventListener('click', clearGrid);
     downloadBtn.addEventListener('click', generateAndDownload3MF);
@@ -336,5 +315,4 @@ ${buildXML}
     selectColor('null', document.querySelector('.color-swatch[data-color="null"]'));
     
     loadCustomModel();
-
 });
