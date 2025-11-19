@@ -1,77 +1,475 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>pixelmyqube</title>
+    <title>Pixel Grid 3MF Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Carga JSZip de forma síncrona para asegurar disponibilidad -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <link rel="stylesheet" href="assets/style.css">
+    <style>
+        .pixel-cell {
+            border-radius: 50%;
+            transition: transform 0.1s, background-color 0.1s;
+            position: relative;
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.2);
+        }
+        .pixel-cell::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30%; height: 30%;
+            background-color: #1a1a1a;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        #grid-container {
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 1 / 1;
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            grid-template-rows: repeat(16, 1fr);
+            gap: 1px;
+            padding: 10px;
+            margin: 0 auto;
+            /* DUMMY BACKGROUND */
+            background-image: url('https://placehold.co/1024x1024/222/444?text=Fondo+320x320mm');
+            background-size: cover;
+            background-position: center;
+            border: 4px solid #374151;
+            border-radius: 8px;
+        }
+        .color-btn.active {
+            ring: 2px; ring-offset: 2px; --tw-ring-color: #3b82f6; transform: scale(1.1);
+        }
+    </style>
 </head>
-<body class="bg-black font-sans flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-slate-100 text-slate-800 min-h-screen font-sans">
 
-    <div class="bg-white shadow-xl rounded-lg p-6 w-full max-w-4xl">
-        
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">PixelmyQube</h1>
-        
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-slate-900">Generador 3MF (Grid 16x16)</h1>
+            <p class="text-slate-500 text-sm">Objeto base precargado. Salida optimizada para Slicers.</p>
+        </header>
+
         <div class="flex flex-col lg:flex-row gap-6">
+            
+            <!-- PANEL IZQUIERDO -->
+            <div class="w-full lg:w-1/3 space-y-5">
+                
+                <!-- Estado del Modelo Base -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="font-semibold text-sm uppercase tracking-wide text-slate-500">Geometría Base</h2>
+                        <span id="modelStatusBadge" class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold">Cargando...</span>
+                    </div>
+                    <div class="text-xs text-slate-600 bg-slate-50 p-2 rounded">
+                        <p><strong>Origen:</strong> <span id="modelSource">Interno (Dummy)</span></p>
+                        <p><strong>Triángulos:</strong> <span id="triangleCount">---</span></p>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2 italic">El archivo base se carga desde el código/servidor.</p>
+                </div>
 
-            <!-- Panel Izquierdo -->
-            <div class="flex-shrink-0 lg:w-1/3">
-                <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
-                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Controls</h2>
+                <!-- Paleta -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="font-semibold text-sm uppercase tracking-wide text-slate-500 mb-3">Herramientas</h2>
+                    <div class="flex flex-wrap gap-2 mb-4" id="palette"></div>
+                    <div class="flex gap-2">
+                        <button onclick="setMode('paint')" id="btnPaint" class="flex-1 py-2 bg-slate-800 text-white rounded text-sm font-medium">Pintar</button>
+                        <button onclick="setMode('erase')" id="btnErase" class="flex-1 py-2 bg-white border border-slate-300 text-slate-700 rounded text-sm font-medium">Borrar</button>
+                    </div>
+                    <button onclick="clearGrid()" class="w-full mt-2 text-xs text-red-500 hover:text-red-700">Limpiar Todo</button>
+                </div>
 
-                    <!-- Paleta -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-600 mb-2">Color</label>
-                        <div id="color-palette" class="flex flex-wrap gap-3 items-center">
-                            <div class="color-swatch active" data-color="null" style="background-color: #f0f0f0; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 class=%22feather feather-delete%22><path d=%22M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z%22></path><line x1=%2218%22 y1=%229%22 x2=%2212%22 y2=%2215%22></line><line x1=%2212%22 y1=%229%22 x2=%2218%22 y2=%2215%22></line></svg>'); background-size: 60%; background-position: center; background-repeat: no-repeat;" title="Eraser"></div>
-                            <div class="color-swatch" data-color="#E53E3E" style="background-color: #E53E3E" title="Red"></div>
-                            <div class="color-swatch" data-color="#38A169" style="background-color: #38A169" title="Green"></div>
-                            <div class="color-swatch" data-color="#3182CE" style="background-color: #3182CE" title="Blue"></div>
-                            <div class="color-swatch" data-color="#FC6D09" style="background-color: #FC6D09" title="Orange"></div>
-                            <div class="color-swatch" data-color="#FFFFFF" style="background-color: #FFFFFF; border: 1px solid #ddd;" title="White"></div>
-                            
-                            <input type="color" id="color-picker" class="w-10 h-10 p-0 border-none cursor-pointer rounded-full" value="#FF0000">
+                <!-- Exportación -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-end mb-3">
+                        <div>
+                            <h2 class="font-semibold text-sm uppercase tracking-wide text-slate-500">Exportar</h2>
+                            <p class="text-xs text-slate-400">Formato .3MF (Instanciado)</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="block text-2xl font-bold text-slate-800" id="totalCount">0</span>
+                            <span class="text-xs text-slate-500">Objetos</span>
                         </div>
                     </div>
-
-                    <!-- Botones -->
-                    <div class="flex flex-col gap-3 mt-6">
-                        <button id="clear-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Clear Grid
-                        </button>
-                        <button id="download-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors" disabled>
-                            Loading model...
-                        </button>
-                    </div>
-
-                    <!-- Estadísticas -->
-                    <div id="stats-container" class="mt-6">
-                        <h3 class="text-lg font-semibold text-gray-700">Statistics</h3>
-                        <div class="bg-white p-3 rounded mt-2">
-                            <p id="pixel-count-total" class="text-sm text-gray-600">Total: 0 pixels</p>
-                            <div id="pixel-count-colors" class="mt-2 text-sm"></div>
-                        </div>
-                    </div>
-
+                    
+                    <button onclick="generate3MF()" id="downloadBtn" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex justify-center items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Descargar .3MF
+                    </button>
                 </div>
             </div>
 
-            <!-- Grid -->
-            <div class="flex-grow flex items-center justify-center">
-                <div id="grid-container" class="shadow-lg"></div>
+            <!-- PANEL DERECHO: GRID -->
+            <div class="w-full lg:w-2/3">
+                <div class="relative bg-slate-800 rounded-lg p-1 shadow-inner">
+                    <div id="grid-container" onmouseleave="isDragging=false">
+                        <!-- Celdas JS -->
+                    </div>
+                    <!-- Reglas visuales -->
+                    <div class="absolute -top-6 left-0 w-full flex justify-between text-[10px] text-slate-400 px-2">
+                        <span>0mm</span><span>X Axis</span><span>320mm</span>
+                    </div>
+                    <div class="absolute top-0 -left-6 h-full flex flex-col justify-between text-[10px] text-slate-400 py-2">
+                        <span>320</span><span>Y</span><span>0</span>
+                    </div>
+                </div>
             </div>
+        </div>
+    </div>
 
-        </div> 
-    </div> 
+    <script>
+        // ==========================================
+        // CONFIGURACIÓN DEL USUARIO (EDITAR ESTO)
+        // ==========================================
+        
+        // Opción A: URL a tu archivo STL (si lo subes al mismo servidor)
+        // const BASE_STL_URL = './assets/pieza_base.stl';
+        
+        // Opción B: STL incrustado en Base64 (Usamos esto por defecto para la demo)
+        // Este es un cilindro simple con agujero en medio (20mm diametro aprox)
+        const BASE_STL_BASE64 = "c29saWQgYmYXNlX2R1bW15DQpmYWNldCBub3JtYWwgMCAwIDANCm91dGVyIGxvb3ANCnZlcnRleCAxMCAwIDANCnZlcnRleCA5LjIzOSAzLjgyNyAwDQp2ZXJ0ZXggMCAwIDkuNA0KZW5kbG9vcA0KZW5kZmFjZXQNCmZhY2V0IG5vcm1hbCAwIDAgMA0Kb3V0ZXIgbG9vcA0KdmVydGV4IDkuMjM5IDMuODI3IDANCnZlcnRleCA3LjA3MSA3LjA3MSAwDQp2ZXJ0ZXggMCAwIDkuNA0KZW5kbG9vcA0KZW5kZmFjZXQNCmZhY2V0IG5vcm1hbCAwIDAgMA0Kb3V0ZXIgbG9vcA0KdmVydGV4IDcuMDcxIDcuMDcxIDANCnZlcnRleCAzLjgyNyA5LjIzOSAwDQp2ZXJ0ZXggMCAwIDkuNA0KZW5kbG9vcA0KZW5kZmFjZXQNCmZhY2V0IG5vcm1hbCAwIDAgMA0Kb3V0ZXIgbG9vcA0KdmVydGV4IDMuODI3IDkuMjM5IDANCnZlcnRleCA2LjEyZS0xNiAxMCAwDQp2ZXJ0ZXggMCAwIDkuNA0KZW5kbG9vcA0KZW5kZmFjZXQNCmZhY2V0IG5vcm1hbCAwIDAgMA0Kb3V0ZXIgbG9vcA0KdmVydGV4IDYuMTJlLTE2IDEwIDANCnZlcnRleCAtMy44MjcgOS4yMzkgMA0KdmVydGV4IDAgMCA5LjQNCmVuZGxvb3ANCmVuZGZhY2V0DQpmYWNldCBub3JtYWwgMCAwIDANCm91dGVyIGxvb3ANCnZlcnRleCAtMy44MjcgOS4yMzkgMA0KdmVydGV4IC03LjA3MSA3LjA3MSAwDQp2ZXJ0ZXggMCAwIDkuNA0KZW5kbG9vcA0KZW5kZmFjZXQNCmZhY2V0IG5vcm1hbCAwIDAgMA0Kb3V0ZXIgbG9vcA0KdmVydGV4IC03LjA3MSA3LjA3MSAwDQp2ZXJ0ZXggLTkuMjM5IDMuODI3IDANCnZlcnRleCAwIDAgOS40DQplbmRsb29wDQplbmRmYWNldA0KZmFjZXQgbm9ybWFsIDAgMCAwDQpvdXRlciBsb29wDQp2ZXJ0ZXggLTkuMjM5IDMuODI3IDANCnZlcnRleCAtMTAgMS4yMmUtMTUgMA0KdmVydGV4IDAgMCA5LjQNCmVuZGxvb3ANCmVuZGZhY2V0DQpmYWNldCBub3JtYWwgMCAwIDANCm91dGVyIGxvb3ANCnZlcnRleCAtMTAgMS4yMmUtMTUgMA0KdmVydGV4IC05LjIzOSAtMy44MjcgMA0KdmVydGV4IDAgMCA5LjQNCmVuZGxvb3ANCmVuZGZhY2V0DQpmYWNldCBub3JtYWwgMCAwIDANCm91dGVyIGxvb3ANCnZlcnRleCAtOS4yMzkgLTMuODI3IDANCnZlcnRleCAtNy4wNzEgLTcuMDcxIDANCnZlcnRleCAwIDAgOS40DQplbmRsb29wDQplbmRmYWNldA0KZmFjZXQgbm9ybWFsIDAgMCAwDQpvdXRlciBsb29wDQp2ZXJ0ZXggLTcuMDcxIC03LjA3MSAwDQp2ZXJ0ZXggLTMuODI3IC05LjIzOSAwDQp2ZXJ0ZXggMCAwIDkuNA0KZW5kbG9vcA0KZW5kZmFjZXQNCmZhY2V0IG5vcm1hbCAwIDAgMA0Kb3V0ZXIgbG9vcA0KdmVydGV4IC0zLjgyNyAtOS4yMzkgMA0KdmVydGV4IC0xLjgzZS0xNSAtMTAgMA0KdmVydGV4IDAgMCA5LjQNCmVuZGxvb3ANCmVuZGZhY2V0DQpmYWNldCBub3JtYWwgMCAwIDANCm91dGVyIGxvb3ANCnZlcnRleCAtMS44M2UtMTUgLTEwIDANCnZlcnRleCAzLjgyNyAtOS4yMzkgMA0KdmVydGV4IDAgMCA5LjQNCmVuZGxvb3ANCmVuZGZhY2V0DQpmYWNldCBub3JtYWwgMCAwIDANCm91dGVyIGxvb3ANCnZlcnRleCAzLjgyNyAtOS4yMzkgMA0KdmVydGV4IDcuMDcxIC03LjA3MSAwDQp2ZXJ0ZXggMCAwIDkuNA0KZW5kbG9vcA0KZW5kZmFjZXQNCmZhY2V0IG5vcm1hbCAwIDAgMA0Kb3V0ZXIgbG9vcA0KdmVydGV4IDcuMDcxIC03LjA3MSAwDQp2ZXJ0ZXggOS4yMzkgLTMuODI3IDANCnZlcnRleCAwIDAgOS40DQplbmRsb29wDQplbmRmYWNldA0KZmFjZXQgbm9ybWFsIDAgMCAwDQpvdXRlciBsb29wDQp2ZXJ0ZXggOS4yMzkgLTMuODI3IDANCnZlcnRleCAxMCAwIDANCnZlcnRleCAwIDAgOS40DQplbmRsb29wDQplbmRmYWNldA0KZW5kc29saWQgYmYXNlX2R1bW15";
+        
+        const GRID_SIZE = 16;
+        const CELL_SIZE_MM = 20;
+        const COLORS = [
+            { name: 'Rojo', hex: '#EF4444' },
+            { name: 'Azul', hex: '#3B82F6' },
+            { name: 'Verde', hex: '#10B981' },
+            { name: 'Amarillo', hex: '#F59E0B' },
+            { name: 'Negro', hex: '#1F2937' },
+            { name: 'Blanco', hex: '#F3F4F6' },
+            { name: 'Rosa', hex: '#EC4899' },
+            { name: 'Morado', hex: '#8B5CF6' }
+        ];
 
-    <footer class="text-center text-gray-600 text-sm mt-8 pb-4">
-        by <a href="https://okuyuki.cc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Okuyuki</a> for Cooler Master: FreeForm Playground Contest. <span id="app-version" class="ml-2 font-semibold"></span>
-    </footer>
+        // ==========================================
+        // LÓGICA DE LA APLICACIÓN
+        // ==========================================
 
-    <script src="assets/3mfgenerator.js" defer></script>
+        let currentColor = COLORS[0].hex;
+        let isEraser = false;
+        let isDragging = false;
+        let gridData = Array(GRID_SIZE * GRID_SIZE).fill(null);
+        let baseStlData = null; // Objetos {x,y,z}
 
+        async function init() {
+            createPalette();
+            createGrid();
+            await loadInternalModel();
+        }
+
+        // --- CARGA DE MODELO ---
+        async function loadInternalModel() {
+            const badge = document.getElementById('modelStatusBadge');
+            const countDisplay = document.getElementById('triangleCount');
+            
+            try {
+                let arrayBuffer;
+                
+                // Lógica para cargar tu archivo o el dummy
+                if (typeof BASE_STL_URL !== 'undefined') {
+                    const response = await fetch(BASE_STL_URL);
+                    if(!response.ok) throw new Error("No se pudo cargar URL");
+                    arrayBuffer = await response.arrayBuffer();
+                    document.getElementById('modelSource').innerText = "Archivo Externo";
+                } else {
+                    // Fallback a Base64
+                    const binaryString = window.atob(BASE_STL_BASE64);
+                    const len = binaryString.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    arrayBuffer = bytes.buffer;
+                }
+
+                baseStlData = parseSTL(arrayBuffer);
+                
+                badge.className = "bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold";
+                badge.innerText = "OK";
+                countDisplay.innerText = (baseStlData.length / 3).toLocaleString();
+
+            } catch (e) {
+                console.error(e);
+                badge.className = "bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-bold";
+                badge.innerText = "Error";
+                countDisplay.innerText = "0";
+                alert("Error cargando el objeto base. Revisa la configuración del código.");
+            }
+        }
+
+        function parseSTL(buffer) {
+            // Detectar ASCII vs Binario (Simplificado: si empieza por "solid" es ASCII)
+            const view = new DataView(buffer);
+            const decoder = new TextDecoder('utf-8');
+            const header = decoder.decode(new Uint8Array(buffer.slice(0, 5)));
+            
+            if (header === 'solid') {
+                return parseAsciiSTL(decoder.decode(new Uint8Array(buffer)));
+            } else {
+                return parseBinarySTL(view);
+            }
+        }
+
+        function parseBinarySTL(dataView) {
+            const triangleCount = dataView.getUint32(80, true);
+            const vertices = [];
+            let offset = 84;
+            for (let i = 0; i < triangleCount; i++) {
+                offset += 12; // Normal
+                for (let v = 0; v < 3; v++) {
+                    vertices.push({
+                        x: dataView.getFloat32(offset, true),
+                        y: dataView.getFloat32(offset+4, true),
+                        z: dataView.getFloat32(offset+8, true)
+                    });
+                    offset += 12;
+                }
+                offset += 2; // Attr
+            }
+            return vertices;
+        }
+
+        function parseAsciiSTL(text) {
+            // Parser muy básico para el dummy
+            const vertices = [];
+            const lines = text.split('\n');
+            for(let line of lines) {
+                line = line.trim();
+                if(line.startsWith('vertex')) {
+                    const parts = line.split(/\s+/);
+                    vertices.push({
+                        x: parseFloat(parts[1]),
+                        y: parseFloat(parts[2]),
+                        z: parseFloat(parts[3])
+                    });
+                }
+            }
+            return vertices;
+        }
+
+        // --- INTERFAZ GRID ---
+        function createPalette() {
+            const container = document.getElementById('palette');
+            COLORS.forEach((c, i) => {
+                const btn = document.createElement('button');
+                btn.className = `color-btn w-8 h-8 rounded-full border border-gray-200 shadow-sm ${i===0?'active':''}`;
+                btn.style.backgroundColor = c.hex;
+                btn.onclick = () => selectColor(c.hex, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function selectColor(hex, btn) {
+            currentColor = hex;
+            isEraser = false;
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            updateToolUI();
+        }
+
+        function setMode(mode) {
+            isEraser = (mode === 'erase');
+            if(!isEraser) {
+                // Reactivar color visualmente
+                const btn = Array.from(document.querySelectorAll('.color-btn'))
+                    .find(b => b.style.backgroundColor === rgbToHex(currentColor) || b.style.backgroundColor === currentColor.toLowerCase());
+                if(btn) btn.classList.add('active');
+            } else {
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            }
+            updateToolUI();
+        }
+
+        // Helper para comparar colores si el navegador los convierte a RGB
+        function rgbToHex(col) {
+             if(col.charAt(0)=='#') return col;
+             // No implementamos conversión completa para demo, confiamos en hex
+             return col;
+        }
+
+        function updateToolUI() {
+            const p = document.getElementById('btnPaint');
+            const e = document.getElementById('btnErase');
+            if(isEraser) {
+                e.className = "flex-1 py-2 bg-slate-800 text-white rounded text-sm font-medium";
+                p.className = "flex-1 py-2 bg-white border border-slate-300 text-slate-700 rounded text-sm font-medium";
+            } else {
+                p.className = "flex-1 py-2 bg-slate-800 text-white rounded text-sm font-medium";
+                e.className = "flex-1 py-2 bg-white border border-slate-300 text-slate-700 rounded text-sm font-medium";
+            }
+        }
+
+        function createGrid() {
+            const c = document.getElementById('grid-container');
+            c.innerHTML = '';
+            for(let i=0; i<GRID_SIZE*GRID_SIZE; i++) {
+                const div = document.createElement('div');
+                div.className = 'w-full h-full border border-slate-500/30 cursor-pointer hover:bg-white/10';
+                div.onmousedown = () => { isDragging=true; paint(i, div); };
+                div.onmouseenter = () => { if(isDragging) paint(i, div); };
+                div.onmouseup = () => isDragging=false;
+                c.appendChild(div);
+            }
+            document.onmouseup = () => isDragging=false;
+        }
+
+        function paint(i, el) {
+            if(isEraser) {
+                gridData[i] = null;
+                el.style.backgroundColor = 'transparent';
+                el.className = el.className.replace(' pixel-cell', '');
+            } else {
+                gridData[i] = currentColor;
+                el.style.backgroundColor = currentColor;
+                if(!el.className.includes('pixel-cell')) el.className += ' pixel-cell';
+            }
+            document.getElementById('totalCount').innerText = gridData.filter(x=>x).length;
+        }
+
+        function clearGrid() {
+            if(confirm("¿Borrar todo?")) {
+                gridData.fill(null);
+                createGrid(); // Rebuild fast
+                document.getElementById('totalCount').innerText = 0;
+            }
+        }
+
+        // ==========================================
+        // GENERADOR 3MF (CORE)
+        // ==========================================
+
+        async function generate3MF() {
+            if (!baseStlData) return alert("Modelo base no cargado.");
+            
+            const btn = document.getElementById('downloadBtn');
+            btn.innerText = "Generando...";
+            btn.disabled = true;
+
+            const zip = new JSZip();
+
+            // 1. [Content_Types].xml
+            const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+ <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+ <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+</Types>`;
+            zip.file("[Content_Types].xml", contentTypes);
+
+            // 2. _rels/.rels
+            const rels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
+</Relationships>`;
+            zip.folder("_rels").file(".rels", rels);
+
+            // 3. 3D Model Logic
+            const modelXML = generateModelXML();
+            zip.folder("3D").file("3dmodel.model", modelXML);
+
+            // 4. Download
+            const blob = await zip.generateAsync({type:"blob"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "grid_design.3mf";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            btn.innerText = "Descargar .3MF";
+            btn.disabled = false;
+        }
+
+        function generateModelXML() {
+            // Construir lista de vértices/triángulos del objeto base (ID 1)
+            let vertexStr = "";
+            let triangleStr = "";
+            
+            // NOTA: 3MF es indexado. STL es "triángulo sopa".
+            // Para mantenerlo simple en JS, no vamos a deduplicar vértices (hace el archivo más grande pero es más rápido de codificar)
+            // Cada triángulo usa 3 vértices nuevos.
+            
+            for(let i=0; i<baseStlData.length; i++) {
+                const v = baseStlData[i];
+                vertexStr += `<vertex x="${v.x}" y="${v.y}" z="${v.z}" />`;
+            }
+            
+            for(let i=0; i<baseStlData.length; i+=3) {
+                triangleStr += `<triangle v1="${i}" v2="${i+1}" v3="${i+2}" />`;
+            }
+
+            // Definir Colores (Materiales)
+            // ID Group = 1
+            let materialItems = "";
+            // Mapeo de Hex a Índice para usar en el loop
+            const colorMap = {}; 
+            
+            COLORS.forEach((c, index) => {
+                materialItems += `<base name="${c.name}" displaycolor="${c.hex}" />`;
+                colorMap[c.hex] = index;
+            });
+
+            // Definir Build Items (Instancias)
+            let buildItems = "";
+            
+            gridData.forEach((hexColor, index) => {
+                if(!hexColor) return;
+
+                const gridX = index % GRID_SIZE;
+                const gridY = Math.floor(index / GRID_SIZE);
+
+                // Posición física
+                const xPos = gridX * CELL_SIZE_MM;
+                // Invertimos Y para que coincida visualmente (HTML top-left vs 3D bottom-left)
+                const yPos = (GRID_SIZE - 1 - gridY) * CELL_SIZE_MM;
+                
+                // Matriz Transformación 3MF (Affine 4x3 flatten): 
+                // m00 m01 m02 m10 m11 m12 m20 m21 m22 m30 m31 m32
+                // Identity rotation (1 0 0, 0 1 0, 0 0 1) + Translation (x y 0)
+                // Nota: m30=x, m31=y, m32=z
+                const matrix = `1 0 0 0 1 0 0 0 1 ${xPos} ${yPos} 0`;
+
+                const matIndex = colorMap[hexColor];
+
+                // Object ID 1 es la malla.
+                // pid="2" es el grupo de colores.
+                // pindex es el índice del color.
+                buildItems += `<item objectid="1" pid="2" pindex="${matIndex}" transform="${matrix}" />`;
+            });
+
+            return `<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">
+ <resources>
+  <!-- Colores -->
+  <m:colorgroup id="2">
+   ${materialItems}
+  </m:colorgroup>
+  
+  <!-- Objeto Base (Geometría Única) -->
+  <object id="1" type="model">
+   <mesh>
+    <vertices>
+     ${vertexStr}
+    </vertices>
+    <triangles>
+     ${triangleStr}
+    </triangles>
+   </mesh>
+  </object>
+ </resources>
+ 
+ <build>
+  ${buildItems}
+ </build>
+</model>`;
+        }
+
+        init();
+
+    </script>
 </body>
 </html>
