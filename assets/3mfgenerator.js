@@ -1,24 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    const APP_VERSION = "v1.2.4 - Z-Fix & Perturbation";
+    const APP_VERSION = "v1.3.0 - Geometric Mutation";
     
-    // --- GLOBALS ---
     const JSZip = window.JSZip;
     if (!JSZip) {
         alert("Fatal Error: JSZip library not found.");
         return;
     }
 
-    // --- CONFIGURATION ---
     const GRID_SIZE = 17;
     const OBJECT_DIM_MM = 20; 
     const SPACING_MM = 2; 
     const TOTAL_CELL_DIM_MM = OBJECT_DIM_MM + SPACING_MM; 
     
-    // Scale for OBJ
     const OBJ_SCALE = 10.0; 
 
-    // --- DOM ELEMENTS ---
     const gridContainer = document.getElementById('grid-container');
     const colorPalette = document.getElementById('color-palette');
     const colorPicker = document.getElementById('color-picker');
@@ -28,15 +24,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const statsColorsEl = document.getElementById('pixel-count-colors');
     const versionSpan = document.getElementById('app-version');
 
-    // --- STATE ---
     let selectedColor = "null"; 
     let isMouseDown = false; 
     let gridData = new Array(GRID_SIZE * GRID_SIZE).fill(null);
     
-    // Stores the raw geometry from OBJ
-    let rawGeometry = null; // { vertices: [{x,y,z}], triangles: [{v1,v2,v3}] }
-
-    // --- 1. UI & INTERACTION FUNCTIONS ---
+    // Guardaremos los datos raw (números) no strings XML, para poder manipularlos
+    let rawModelData = null; // { vertices: [{x,y,z}], triangles: [{v1,v2,v3}] }
 
     function createGrid() {
         gridContainer.innerHTML = ''; 
@@ -115,14 +108,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newColor !== 'null' && !activeSwatch) colorPicker.value = newColor;
     }
 
-    // --- 2. GEOMETRY PROCESSING (OBJ PARSER & Z-FIX) ---
+    // --- LÓGICA DE PROCESADO OBJ (NORMALIZACIÓN Z) ---
 
     function parseAndNormalizeOBJ(objText) {
         const vertices = [];
         const triangles = [];
         const lines = objText.split('\n');
 
-        // 1. Parse Raw
         for (const line of lines) {
             const parts = line.trim().split(/\s+/);
             if (parts[0] === 'v') {
@@ -133,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             } else if (parts[0] === 'f') {
                 const faceIndices = parts.slice(1).map(p => parseInt(p.split('/')[0]) - 1);
-                // Triangulate fans manually if needed (simple method for convex polys)
+                // Triangulación simple
                 for (let i = 1; i < faceIndices.length - 1; i++) {
                     triangles.push({
                         v1: faceIndices[0],
@@ -144,18 +136,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 2. Calculate Z-Min for Grounding
+        // Calcular Z Mínimo para poner el objeto a ras de suelo
         let minZ = Infinity;
         vertices.forEach(v => {
             if (v.z < minZ) minZ = v.z;
         });
 
-        // 3. Normalize (Scale & Shift Z to 0)
-        // We apply scale AND subtract minZ so the object sits perfectly on the bed.
+        // Normalizar vértices (Escalar y bajar Z a 0)
         const processedVertices = vertices.map(v => ({
             x: v.x * OBJ_SCALE,
             y: v.y * OBJ_SCALE,
-            z: (v.z - minZ) * OBJ_SCALE // This shifts the lowest point to 0
+            z: (v.z - minZ) * OBJ_SCALE 
         }));
 
         return { vertices: processedVertices, triangles: triangles };
@@ -167,13 +158,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error('OBJ fetch failed');
             const text = await response.text();
             
-            rawGeometry = parseAndNormalizeOBJ(text);
+            rawModelData = parseAndNormalizeOBJ(text);
             
             downloadBtn.disabled = false;
             downloadBtn.textContent = 'Download .3MF';
         } catch (e) {
             console.error(e);
-            // If local, provide help message
             if (window.location.protocol === 'file:') {
                 alert("Error: Cannot load local files directly. Please use a local server or GitHub Pages.");
             } else {
@@ -183,55 +173,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 3. 3MF GENERATION CORE ---
+    // --- GENERACIÓN 3MF (CON MUTACIÓN GEOMÉTRICA) ---
 
     async function generateAndDownload3MF() {
-        if (!rawGeometry) return;
+        if (!rawModelData) return;
 
         const zip = new JSZip();
 
-        // A. The Relationships file
         const relsXML = `<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
     <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />
 </Relationships>`;
         zip.folder("_rels").file(".rels", relsXML);
 
-        // B. The 3D Model file
         const uniqueColors = [...new Set(gridData.filter(c => c !== null))];
         
-        // B1. Materials Definition
+        // 1. Definición de Materiales
         let materialsXML = `<basematerials id="1">`;
         uniqueColors.forEach((c, i) => {
             materialsXML += `\n    <base name="Color ${i}" displaycolor="${c}" />`;
         });
         materialsXML += `\n</basematerials>`;
 
-        // B2. Object Definitions (Mesh Duplication + Micro-Perturbation)
-        // We create a unique Object Definition for EACH color.
-        // We slightly shift vertices to force the slicer to treat them as unique meshes.
+        // 2. Definición de Objetos (Aquí ocurre la magia)
         let objectsXML = "";
         const colorToObjID = {};
         let objIdCounter = 2;
+
+        // Generamos la cadena de triángulos una sola vez, ya que no cambia
+        let triStr = "";
+        rawModelData.triangles.forEach(t => {
+            triStr += `\n<triangle v1="${t.v1}" v2="${t.v2}" v3="${t.v3}" />`;
+        });
 
         uniqueColors.forEach((color, colIndex) => {
             const objID = objIdCounter++;
             colorToObjID[color] = objID;
 
-            // Generate perturbed vertices for this specific color
-            // Shift amount: 0.0001mm * colIndex (imperceptible but mathematically distinct)
+            // MUTACIÓN GEOMÉTRICA:
+            // Creamos una copia de los vértices para ESTE color específico.
+            // Movemos ligeramente el PRIMER vértice basándonos en el índice del color.
+            // Esto hace que la malla de cada color sea matemáticamente única e impide
+            // que el laminador las fusione.
             let vertStr = "";
-            rawGeometry.vertices.forEach(v => {
-                const shift = 0.0001 * colIndex;
-                vertStr += `\n<vertex x="${v.x + shift}" y="${v.y + shift}" z="${v.z + shift}" />`;
+            rawModelData.vertices.forEach((v, vIndex) => {
+                let x = v.x;
+                let y = v.y;
+                let z = v.z;
+
+                // Solo mutamos el primer vértice de la lista
+                if (vIndex === 0) {
+                    x += 0.0001 * (colIndex + 1); // Desplazamiento microscópico
+                }
+
+                vertStr += `\n<vertex x="${x}" y="${y}" z="${z}" />`;
             });
 
-            let triStr = "";
-            rawGeometry.triangles.forEach(t => {
-                triStr += `\n<triangle v1="${t.v1}" v2="${t.v2}" v3="${t.v3}" />`;
-            });
-
-            // Define the object with PID/PINDEX strictly on the Object tag
+            // Definimos el objeto asignándole su grupo de material y su índice de color
             objectsXML += `
 <object id="${objID}" type="model" pid="1" pindex="${colIndex}">
     <mesh>
@@ -241,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </object>`;
         });
 
-        // B3. Build Items
+        // 3. Construcción de la escena
         let itemsXML = "";
         const objectCenterOffset = OBJECT_DIM_MM / 2;
 
@@ -250,9 +248,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const x = (index % GRID_SIZE) * TOTAL_CELL_DIM_MM + objectCenterOffset;
                 const y = (GRID_SIZE - 1 - Math.floor(index / GRID_SIZE)) * TOTAL_CELL_DIM_MM + objectCenterOffset;
                 
+                // Recuperamos el ID del objeto que ya tiene el color y la geometría mutada correctos
                 const objID = colorToObjID[color];
                 
-                // Simply place the pre-colored object
                 itemsXML += `\n<item objectid="${objID}" transform="1 0 0 0 1 0 0 0 1 ${x} ${y} 0" />`;
             }
         });
@@ -270,7 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         zip.folder("3D").file("3dmodel.model", modelXML);
 
-        // C. Content Types
         const contentTypesXML = `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
     <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />
@@ -278,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </Types>`;
         zip.file("[Content_Types].xml", contentTypesXML);
 
-        // D. Generate Zip
         try {
             const blob = await zip.generateAsync({ type: "blob" });
             const link = document.createElement('a');
@@ -293,8 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-    // --- 4. INITIALIZATION ---
     if (versionSpan) versionSpan.textContent = APP_VERSION;
 
     window.addEventListener('mouseup', () => isMouseDown = false);
